@@ -24,6 +24,12 @@ const routes = [
     name: 'Stats',
     component: () => import('@/views/Stats.vue'),
     meta: { title: '数据统计' }
+  },
+  {
+    path: '/archive',
+    name: 'Archive',
+    component: () => import('@/views/Archive.vue'),
+    meta: { title: '归档习惯' }
   }
 ]
 

@@ -6,6 +6,7 @@ const CACHE_KEY = 'habit_assistant_cache'
 export const useHabitStore = defineStore('habit', {
   state: () => ({
     habits: [],
+    archivedHabits: [],
     checkins: {},
     schedules: [],
     currentSchedule: null,
@@ -60,7 +61,8 @@ export const useHabitStore = defineStore('habit', {
       const today = dayjs().format('YYYY-MM-DD')
       const todayCheckins = state.checkins[today] || {}
       if (state.habits.length === 0) return 0
-      const completed = Object.values(todayCheckins).filter(v => v).length
+      const activeIds = state.habits.map(h => h.id)
+      const completed = Object.entries(todayCheckins).filter(([id, v]) => v && activeIds.includes(Number(id))).length
       return Math.round((completed / state.habits.length) * 100)
     },
     starredHabits: (state) => {
@@ -86,10 +88,11 @@ export const useHabitStore = defineStore('habit', {
     },
     weekStats: (state) => {
       const stats = []
+      const activeIds = state.habits.map(h => h.id)
       for (let i = 6; i >= 0; i--) {
         const date = dayjs().subtract(i, 'day').format('YYYY-MM-DD')
         const checkins = state.checkins[date] || {}
-        const completed = Object.values(checkins).filter(v => v).length
+        const completed = Object.entries(checkins).filter(([id, v]) => v && activeIds.includes(Number(id))).length
         const total = state.habits.length
         stats.push({
           date,
@@ -110,6 +113,7 @@ export const useHabitStore = defineStore('habit', {
         if (cached) {
           const data = JSON.parse(cached)
           this.habits = data.habits || []
+          this.archivedHabits = data.archivedHabits || []
           this.checkins = data.checkins || {}
           this.schedules = data.schedules || []
           this.currentSchedule = data.currentSchedule || this.templates[0]
@@ -126,6 +130,7 @@ export const useHabitStore = defineStore('habit', {
       try {
         localStorage.setItem(CACHE_KEY, JSON.stringify({
           habits: this.habits,
+          archivedHabits: this.archivedHabits,
           checkins: this.checkins,
           schedules: this.schedules,
           currentSchedule: this.currentSchedule,
@@ -138,11 +143,12 @@ export const useHabitStore = defineStore('habit', {
 
     initDefaultData() {
       this.habits = [
-        { id: 1, name: '早起', category: '作息', time: '07:00', remind: true, color: '#3b82f6', starred: true },
-        { id: 2, name: '阅读30分钟', category: '学习', time: '20:00', remind: true, color: '#10b981', starred: false },
-        { id: 3, name: '运动锻炼', category: '健康', time: '18:00', remind: false, color: '#f59e0b', starred: false },
-        { id: 4, name: '喝8杯水', category: '健康', time: '', remind: false, color: '#06b6d4', starred: true }
+        { id: 1, name: '早起', category: '作息', time: '07:00', remind: true, color: '#3b82f6', starred: true, archived: false },
+        { id: 2, name: '阅读30分钟', category: '学习', time: '20:00', remind: true, color: '#10b981', starred: false, archived: false },
+        { id: 3, name: '运动锻炼', category: '健康', time: '18:00', remind: false, color: '#f59e0b', starred: false, archived: false },
+        { id: 4, name: '喝8杯水', category: '健康', time: '', remind: false, color: '#06b6d4', starred: true, archived: false }
       ]
+      this.archivedHabits = []
       this.starredOrder = [1, 4]
       this.currentSchedule = this.templates[0]
       this.saveToCache()
@@ -251,6 +257,97 @@ export const useHabitStore = defineStore('habit', {
     getRandomColor() {
       const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899']
       return colors[Math.floor(Math.random() * colors.length)]
+    },
+
+    archiveHabit(id) {
+      const index = this.habits.findIndex(h => h.id === id)
+      if (index > -1) {
+        const habit = { ...this.habits[index], archived: true, archiveTime: new Date().toISOString() }
+        this.habits.splice(index, 1)
+        this.archivedHabits.unshift(habit)
+        this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+        this.saveToCache()
+        return habit
+      }
+      return null
+    },
+
+    unarchiveHabit(id) {
+      const index = this.archivedHabits.findIndex(h => h.id === id)
+      if (index > -1) {
+        const habit = { ...this.archivedHabits[index], archived: false, archiveTime: null }
+        this.archivedHabits.splice(index, 1)
+        if (habit.starred) {
+          this.starredOrder.push(habit.id)
+        }
+        this.habits.push(habit)
+        this.saveToCache()
+        return habit
+      }
+      return null
+    },
+
+    getHabitCheckinStats(habitId) {
+      let totalDays = 0
+      let completedDays = 0
+      let currentStreak = 0
+      let maxStreak = 0
+      const dates = []
+
+      Object.keys(this.checkins).forEach(date => {
+        if (this.checkins[date][habitId]) {
+          totalDays++
+          completedDays++
+          dates.push(date)
+        } else {
+          totalDays++
+        }
+      })
+
+      dates.sort()
+      
+      if (dates.length > 0) {
+        let streak = 1
+        maxStreak = 1
+        for (let i = 1; i < dates.length; i++) {
+          const prev = dayjs(dates[i - 1])
+          const curr = dayjs(dates[i])
+          if (curr.diff(prev, 'day') === 1) {
+            streak++
+            if (streak > maxStreak) {
+              maxStreak = streak
+            }
+          } else {
+            streak = 1
+          }
+        }
+
+        const today = dayjs().format('YYYY-MM-DD')
+        const yesterday = dayjs().subtract(1, 'day').format('YYYY-MM-DD')
+        if (dates.includes(today)) {
+          currentStreak = 1
+          let d = dayjs(today).subtract(1, 'day')
+          while (dates.includes(d.format('YYYY-MM-DD'))) {
+            currentStreak++
+            d = d.subtract(1, 'day')
+          }
+        } else if (dates.includes(yesterday)) {
+          currentStreak = 1
+          let d = dayjs(yesterday).subtract(1, 'day')
+          while (dates.includes(d.format('YYYY-MM-DD'))) {
+            currentStreak++
+            d = d.subtract(1, 'day')
+          }
+        }
+      }
+
+      return {
+        totalDays,
+        completedDays,
+        currentStreak,
+        maxStreak,
+        completionRate: totalDays > 0 ? Math.round((completedDays / totalDays) * 100) : 0
+      }
     }
   }
 })

@@ -5,9 +5,12 @@
         <div class="title">习惯清单</div>
         <div class="subtitle">共 {{ store.habits.length }} 个习惯</div>
       </div>
-      <van-button type="primary" size="small" round icon="plus" @click="showAdd = true">
-        添加
-      </van-button>
+      <div class="header-actions">
+        <van-icon name="folder-o" class="archive-icon" @click="goToArchive" />
+        <van-button type="primary" size="small" round icon="plus" @click="showAdd = true">
+          添加
+        </van-button>
+      </div>
     </div>
 
     <div class="category-tabs">
@@ -93,6 +96,9 @@
             </van-field>
           </van-cell-group>
           <div class="form-actions">
+            <van-button v-if="editingHabit" round block type="default" style="margin-bottom: 10px" @click="archiveHabit">
+              归档习惯
+            </van-button>
             <van-button v-if="editingHabit" round block type="danger" style="margin-bottom: 10px" @click="deleteHabit">
               删除习惯
             </van-button>
@@ -125,10 +131,12 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useHabitStore } from '@/store/habit'
 import { showToast, showConfirmDialog } from 'vant'
 
 const store = useHabitStore()
+const router = useRouter()
 const activeCategory = ref('全部')
 const showAdd = ref(false)
 const showCategory = ref(false)
@@ -193,6 +201,23 @@ const deleteHabit = async () => {
   } catch (e) {}
 }
 
+const archiveHabit = async () => {
+  try {
+    await showConfirmDialog({
+      title: '确认归档',
+      message: `确定要归档「${editingHabit.value.name}」吗？归档后不再出现在打卡和清单中，但历史数据仍可在归档页查看。`,
+      confirmButtonColor: '#3b82f6'
+    })
+    store.archiveHabit(editingHabit.value.id)
+    showToast('已归档')
+    closeForm()
+  } catch (e) {}
+}
+
+const goToArchive = () => {
+  router.push('/archive')
+}
+
 const toggleStar = (id) => {
   store.toggleStarred(id)
 }
@@ -207,6 +232,22 @@ const getCategoryIcon = (category) => {
 </script>
 
 <style lang="scss" scoped>
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.archive-icon {
+  font-size: 22px;
+  color: $text-secondary;
+  cursor: pointer;
+  
+  &:active {
+    opacity: 0.7;
+  }
+}
+
 .category-tabs {
   margin: 0 -16px 16px;
 }

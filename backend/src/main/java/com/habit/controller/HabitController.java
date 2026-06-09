@@ -74,4 +74,30 @@ public class HabitController {
         statsService.clearStatsCache();
         return Result.success();
     }
+    
+    @GetMapping("/archived")
+    public Result<List<Habit>> getArchivedHabitList() {
+        List<Habit> habits = habitService.getArchivedHabitList();
+        return Result.success(habits);
+    }
+    
+    @PostMapping("/{id}/archive")
+    public Result<Habit> archiveHabit(@PathVariable Long id) {
+        Habit habit = habitService.archiveHabit(id);
+        if (habit == null) {
+            return Result.error("习惯不存在");
+        }
+        statsService.clearStatsCache();
+        return Result.success(habit);
+    }
+    
+    @PostMapping("/{id}/unarchive")
+    public Result<Habit> unarchiveHabit(@PathVariable Long id) {
+        Habit habit = habitService.unarchiveHabit(id);
+        if (habit == null) {
+            return Result.error("习惯不存在");
+        }
+        statsService.clearStatsCache();
+        return Result.success(habit);
+    }
 }

@@ -25,6 +25,10 @@ public class Habit {
     
     private Integer sortOrder;
     
+    private Boolean archived;
+    
+    private LocalDateTime archiveTime;
+    
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
     

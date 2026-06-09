@@ -44,9 +44,14 @@ public class StatsService {
         List<Habit> habits = habitService.getHabitList();
         int totalHabits = habits.size();
         
+        Set<Long> activeHabitIds = new HashSet<>();
+        for (Habit habit : habits) {
+            activeHabitIds.add(habit.getId());
+        }
+        
         Map<LocalDate, Integer> completedMap = new HashMap<>();
         for (Checkin checkin : checkins) {
-            if (checkin.getCompleted()) {
+            if (checkin.getCompleted() && activeHabitIds.contains(checkin.getHabitId())) {
                 completedMap.merge(checkin.getCheckinDate(), 1, Integer::sum);
             }
         }
@@ -89,9 +94,14 @@ public class StatsService {
         List<Habit> habits = habitService.getHabitList();
         int totalHabits = habits.size();
         
+        Set<Long> activeHabitIds = new HashSet<>();
+        for (Habit habit : habits) {
+            activeHabitIds.add(habit.getId());
+        }
+        
         Map<LocalDate, Integer> completedMap = new HashMap<>();
         for (Checkin checkin : checkins) {
-            if (checkin.getCompleted()) {
+            if (checkin.getCompleted() && activeHabitIds.contains(checkin.getHabitId())) {
                 completedMap.merge(checkin.getCheckinDate(), 1, Integer::sum);
             }
         }

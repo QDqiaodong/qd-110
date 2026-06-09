@@ -11,11 +11,14 @@ CREATE TABLE IF NOT EXISTS habit (
     color VARCHAR(20) DEFAULT '#3b82f6' COMMENT '颜色',
     starred TINYINT(1) DEFAULT 0 COMMENT '是否星标',
     sort_order INT DEFAULT 0 COMMENT '排序号',
+    archived TINYINT(1) DEFAULT 0 COMMENT '是否归档',
+    archive_time DATETIME DEFAULT NULL COMMENT '归档时间',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted TINYINT(1) DEFAULT 0 COMMENT '逻辑删除',
     INDEX idx_category (category),
     INDEX idx_starred (starred),
+    INDEX idx_archived (archived),
     INDEX idx_create_time (create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='习惯表';
 

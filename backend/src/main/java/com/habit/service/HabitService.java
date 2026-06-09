@@ -20,9 +20,41 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
     
     public List<Habit> getHabitList() {
         return this.list(new LambdaQueryWrapper<Habit>()
+                .eq(Habit::getArchived, false)
                 .orderByDesc(Habit::getStarred)
                 .orderByAsc(Habit::getSortOrder)
                 .orderByDesc(Habit::getCreateTime));
+    }
+    
+    public List<Habit> getArchivedHabitList() {
+        return this.list(new LambdaQueryWrapper<Habit>()
+                .eq(Habit::getArchived, true)
+                .orderByDesc(Habit::getArchiveTime)
+                .orderByDesc(Habit::getCreateTime));
+    }
+    
+    public Habit archiveHabit(Long id) {
+        Habit habit = this.getById(id);
+        if (habit == null) {
+            return null;
+        }
+        habit.setArchived(true);
+        habit.setArchiveTime(java.time.LocalDateTime.now());
+        this.updateById(habit);
+        clearCache();
+        return habit;
+    }
+    
+    public Habit unarchiveHabit(Long id) {
+        Habit habit = this.getById(id);
+        if (habit == null) {
+            return null;
+        }
+        habit.setArchived(false);
+        habit.setArchiveTime(null);
+        this.updateById(habit);
+        clearCache();
+        return habit;
     }
     
     public Habit createHabit(HabitDTO dto) {

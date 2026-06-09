@@ -89,7 +89,8 @@ let chartInstance = null
 
 const totalHabits = computed(() => store.habits.length)
 const todayCompleted = computed(() => {
-  return Object.values(store.todayCheckins).filter(v => v).length
+  const activeIds = store.habits.map(h => h.id)
+  return Object.entries(store.todayCheckins).filter(([id, v]) => v && activeIds.includes(Number(id))).length
 })
 const avgRate = computed(() => {
   const stats = store.weekStats
@@ -198,6 +199,7 @@ const getMonthData = () => {
   const values = []
   const daysInMonth = new Date().getDate()
   const sampleDays = Math.min(daysInMonth, 30)
+  const activeIds = store.habits.map(h => h.id)
   
   for (let i = sampleDays - 1; i >= 0; i -= 2) {
     const date = new Date()
@@ -206,7 +208,7 @@ const getMonthData = () => {
     labels.push(date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }))
     
     const checkins = store.checkins[dateStr] || {}
-    const completed = Object.values(checkins).filter(v => v).length
+    const completed = Object.entries(checkins).filter(([id, v]) => v && activeIds.includes(Number(id))).length
     const rate = store.habits.length > 0 ? Math.round((completed / store.habits.length) * 100) : 0
     values.push(rate)
   }
