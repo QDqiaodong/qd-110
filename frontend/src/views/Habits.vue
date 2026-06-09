@@ -33,7 +33,10 @@
             {{ getCategoryIcon(habit.category) }}
           </div>
           <div class="habit-info">
-            <div class="habit-name">{{ habit.name }}</div>
+            <div class="habit-name">
+              {{ habit.name }}
+              <span v-if="habit.starred" class="star-badge">⭐</span>
+            </div>
             <div class="habit-meta">
               <span class="habit-category">{{ habit.category }}</span>
               <span v-if="habit.time" class="habit-time">⏰ {{ habit.time }}</span>
@@ -41,7 +44,15 @@
             </div>
           </div>
         </div>
-        <van-icon name="arrow" />
+        <div class="habit-actions">
+          <van-icon
+            :name="habit.starred ? 'star' : 'star-o'"
+            :class="{ 'star-active': habit.starred }"
+            class="star-icon"
+            @click.stop="toggleStar(habit.id)"
+          />
+          <van-icon name="arrow" />
+        </div>
       </div>
     </div>
 
@@ -59,6 +70,11 @@
             <van-cell title="开启提醒" is-link>
               <template #right-icon>
                 <van-switch v-model="form.remind" size="20" />
+              </template>
+            </van-cell>
+            <van-cell title="设为星标" is-link>
+              <template #right-icon>
+                <van-switch v-model="form.starred" size="20" />
               </template>
             </van-cell>
             <van-field label="选择颜色">
@@ -128,6 +144,7 @@ const form = ref({
   category: '生活',
   time: '',
   remind: false,
+  starred: false,
   color: '#3b82f6'
 })
 
@@ -149,7 +166,7 @@ const editHabit = (habit) => {
 const closeForm = () => {
   showAdd.value = false
   editingHabit.value = null
-  form.value = { name: '', category: '生活', time: '', remind: false, color: '#3b82f6' }
+  form.value = { name: '', category: '生活', time: '', remind: false, starred: false, color: '#3b82f6' }
 }
 
 const submitForm = () => {
@@ -174,6 +191,10 @@ const deleteHabit = async () => {
     showToast('删除成功')
     closeForm()
   } catch (e) {}
+}
+
+const toggleStar = (id) => {
+  store.toggleStarred(id)
 }
 
 const getCategoryIcon = (category) => {
@@ -231,6 +252,33 @@ const getCategoryIcon = (category) => {
   font-size: 16px;
   font-weight: 500;
   margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.star-badge {
+  font-size: 14px;
+}
+
+.habit-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.star-icon {
+  font-size: 20px;
+  color: #d1d5db;
+  transition: all 0.2s;
+  
+  &.star-active {
+    color: #f59e0b;
+  }
+  
+  &:active {
+    transform: scale(1.2);
+  }
 }
 
 .habit-meta {

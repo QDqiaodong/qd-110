@@ -10,33 +10,96 @@
       </van-circle>
     </div>
 
-    <div class="habit-list">
-      <div v-if="store.habits.length === 0" class="empty-state">
-        <div class="empty-icon">📋</div>
-        <div class="empty-text">暂无习惯，去添加一个吧</div>
+    <div v-if="store.starredHabits.length > 0" class="starred-section">
+      <div class="section-header">
+        <div class="section-title">
+          <span class="star-icon">⭐</span>
+          今日先做
+        </div>
+        <div class="section-action" @click="toggleSortMode">
+          <van-icon :name="isSorting ? 'checked' : 'sort'" />
+          <span>{{ isSorting ? '完成' : '排序' }}</span>
+        </div>
       </div>
       
-      <div
-        v-for="habit in store.habits"
-        :key="habit.id"
-        class="habit-card"
-        :class="{ completed: isChecked(habit.id) }"
-        @click="toggleCheckin(habit.id)"
-      >
-        <div class="habit-left">
-          <div class="habit-icon" :style="{ background: habit.color + '20', color: habit.color }">
-            {{ getCategoryIcon(habit.category) }}
+      <div class="starred-list">
+        <div
+          v-for="(habit, index) in store.starredHabits"
+          :key="habit.id"
+          class="starred-card"
+          :class="{ 
+            completed: isChecked(habit.id),
+            sorting: isSorting,
+            dragging: dragIndex === index
+          }"
+          draggable="true"
+          @dragstart="onDragStart($event, index)"
+          @dragover.prevent="onDragOver($event, index)"
+          @dragend="onDragEnd"
+          @click="!isSorting && toggleCheckin(habit.id)"
+        >
+          <div v-if="isSorting" class="drag-handle">
+            <van-icon name="wap-nav" />
           </div>
-          <div class="habit-info">
-            <div class="habit-name">{{ habit.name }}</div>
-            <div class="habit-meta">
-              <span class="habit-category">{{ habit.category }}</span>
-              <span v-if="habit.time" class="habit-time">⏰ {{ habit.time }}</span>
+          <div class="habit-left">
+            <div class="habit-icon" :style="{ background: habit.color + '20', color: habit.color }">
+              {{ getCategoryIcon(habit.category) }}
+            </div>
+            <div class="habit-info">
+              <div class="habit-name">
+                {{ habit.name }}
+                <span class="star-badge">⭐</span>
+              </div>
+              <div class="habit-meta">
+                <span class="habit-category">{{ habit.category }}</span>
+                <span v-if="habit.time" class="habit-time">⏰ {{ habit.time }}</span>
+              </div>
             </div>
           </div>
+          <div class="habit-check">
+            <van-checkbox 
+              :model-value="isChecked(habit.id)" 
+              :style="{ '--van-checkbox-checked-icon-color': habit.color }" 
+              @click.stop
+            />
+          </div>
         </div>
-        <div class="habit-check">
-          <van-checkbox :model-value="isChecked(habit.id)" :style="{ '--van-checkbox-checked-icon-color': habit.color }" />
+      </div>
+    </div>
+
+    <div class="habit-section">
+      <div v-if="store.starredHabits.length > 0" class="section-divider">
+        <span>其他习惯</span>
+      </div>
+
+      <div class="habit-list">
+        <div v-if="store.nonStarredHabits.length === 0 && store.starredHabits.length === 0" class="empty-state">
+          <div class="empty-icon">📋</div>
+          <div class="empty-text">暂无习惯，去添加一个吧</div>
+        </div>
+        
+        <div
+          v-for="habit in store.nonStarredHabits"
+          :key="habit.id"
+          class="habit-card"
+          :class="{ completed: isChecked(habit.id) }"
+          @click="toggleCheckin(habit.id)"
+        >
+          <div class="habit-left">
+            <div class="habit-icon" :style="{ background: habit.color + '20', color: habit.color }">
+              {{ getCategoryIcon(habit.category) }}
+            </div>
+            <div class="habit-info">
+              <div class="habit-name">{{ habit.name }}</div>
+              <div class="habit-meta">
+                <span class="habit-category">{{ habit.category }}</span>
+                <span v-if="habit.time" class="habit-time">⏰ {{ habit.time }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="habit-check">
+            <van-checkbox :model-value="isChecked(habit.id)" :style="{ '--van-checkbox-checked-icon-color': habit.color }" />
+          </div>
         </div>
       </div>
     </div>
@@ -55,6 +118,11 @@
             <van-cell title="开启提醒" is-link>
               <template #right-icon>
                 <van-switch v-model="form.remind" size="20" />
+              </template>
+            </van-cell>
+            <van-cell title="设为星标" is-link>
+              <template #right-icon>
+                <van-switch v-model="form.starred" size="20" />
               </template>
             </van-cell>
             <van-field label="选择颜色">
@@ -123,6 +191,8 @@ const completionRate = ref(0)
 const showAdd = ref(false)
 const showCategory = ref(false)
 const showTime = ref(false)
+const isSorting = ref(false)
+const dragIndex = ref(-1)
 
 const todayStr = computed(() => dayjs().format('YYYY年MM月DD日 dddd'))
 
@@ -134,6 +204,7 @@ const form = ref({
   category: '生活',
   time: '',
   remind: false,
+  starred: false,
   color: '#3b82f6'
 })
 
@@ -155,7 +226,7 @@ const toggleCheckin = (habitId) => {
 const addHabit = () => {
   store.addHabit(form.value)
   showAdd.value = false
-  form.value = { name: '', category: '生活', time: '', remind: false, color: '#3b82f6' }
+  form.value = { name: '', category: '生活', time: '', remind: false, starred: false, color: '#3b82f6' }
   showToast('添加成功')
 }
 
@@ -166,9 +237,148 @@ const getCategoryIcon = (category) => {
   }
   return icons[category] || '✨'
 }
+
+const toggleSortMode = () => {
+  isSorting.value = !isSorting.value
+  if (!isSorting.value) {
+    const newOrder = store.starredHabits.map(h => h.id)
+    store.updateStarredOrder(newOrder)
+  }
+}
+
+const onDragStart = (e, index) => {
+  if (!isSorting.value) return
+  dragIndex.value = index
+  e.dataTransfer.effectAllowed = 'move'
+}
+
+const onDragOver = (e, index) => {
+  if (!isSorting.value || dragIndex.value === -1 || dragIndex.value === index) return
+  
+  const fromIndex = dragIndex.value
+  const toIndex = index
+  
+  if (fromIndex !== toIndex) {
+    store.moveStarredHabit(fromIndex, toIndex)
+    dragIndex.value = toIndex
+  }
+}
+
+const onDragEnd = () => {
+  dragIndex.value = -1
+}
 </script>
 
 <style lang="scss" scoped>
+.starred-section {
+  margin-bottom: 20px;
+}
+
+.section-header {
+  @include flex-between;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  
+  .star-icon {
+    font-size: 18px;
+  }
+}
+
+.section-action {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: $primary-color;
+  cursor: pointer;
+  
+  &:active {
+    opacity: 0.7;
+  }
+}
+
+.starred-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.starred-card {
+  @include card;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.2s;
+  border-left: 3px solid #f59e0b;
+  
+  &.completed {
+    opacity: 0.65;
+    border-left-color: #d1d5db;
+    
+    .habit-name {
+      text-decoration: line-through;
+      color: $text-secondary;
+    }
+  }
+  
+  &.sorting {
+    cursor: grab;
+    
+    &:active {
+      cursor: grabbing;
+    }
+  }
+  
+  &.dragging {
+    opacity: 0.5;
+    transform: scale(1.02);
+  }
+  
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.drag-handle {
+  color: #9ca3af;
+  font-size: 18px;
+  cursor: grab;
+  padding: 4px;
+}
+
+.section-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 12px;
+  
+  span {
+    font-size: 13px;
+    color: $text-secondary;
+    white-space: nowrap;
+  }
+  
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: $border-color;
+  }
+}
+
+.habit-section {
+  margin-bottom: 20px;
+}
+
 .habit-list {
   display: flex;
   flex-direction: column;
@@ -219,6 +429,13 @@ const getCategoryIcon = (category) => {
   font-size: 16px;
   font-weight: 500;
   margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.star-badge {
+  font-size: 13px;
 }
 
 .habit-meta {

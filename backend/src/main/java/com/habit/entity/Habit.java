@@ -21,6 +21,10 @@ public class Habit {
     
     private String color;
     
+    private Boolean starred;
+    
+    private Integer sortOrder;
+    
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
     

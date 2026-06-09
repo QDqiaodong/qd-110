@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/habits")
@@ -48,6 +49,27 @@ public class HabitController {
         boolean success = habitService.deleteHabit(id);
         if (!success) {
             return Result.error("删除失败");
+        }
+        statsService.clearStatsCache();
+        return Result.success();
+    }
+    
+    @PostMapping("/{id}/star")
+    public Result<Habit> toggleStarred(@PathVariable Long id) {
+        Habit habit = habitService.toggleStarred(id);
+        if (habit == null) {
+            return Result.error("习惯不存在");
+        }
+        statsService.clearStatsCache();
+        return Result.success(habit);
+    }
+    
+    @PutMapping("/starred/order")
+    public Result<Void> updateStarredOrder(@RequestBody Map<String, List<Long>> body) {
+        List<Long> habitIds = body.get("habitIds");
+        boolean success = habitService.updateStarredOrder(habitIds);
+        if (!success) {
+            return Result.error("更新失败");
         }
         statsService.clearStatsCache();
         return Result.success();

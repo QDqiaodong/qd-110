@@ -9,10 +9,13 @@ CREATE TABLE IF NOT EXISTS habit (
     time VARCHAR(20) COMMENT '执行时间',
     remind TINYINT(1) DEFAULT 0 COMMENT '是否提醒',
     color VARCHAR(20) DEFAULT '#3b82f6' COMMENT '颜色',
+    starred TINYINT(1) DEFAULT 0 COMMENT '是否星标',
+    sort_order INT DEFAULT 0 COMMENT '排序号',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted TINYINT(1) DEFAULT 0 COMMENT '逻辑删除',
     INDEX idx_category (category),
+    INDEX idx_starred (starred),
     INDEX idx_create_time (create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='习惯表';
 
@@ -41,8 +44,8 @@ CREATE TABLE IF NOT EXISTS schedule (
     INDEX idx_is_current (is_current)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='作息模板表';
 
-INSERT INTO habit (name, category, time, remind, color) VALUES
-('早起', '作息', '07:00', 1, '#3b82f6'),
-('阅读30分钟', '学习', '20:00', 1, '#10b981'),
-('运动锻炼', '健康', '18:00', 0, '#f59e0b'),
-('喝8杯水', '健康', NULL, 0, '#06b6d4');
+INSERT INTO habit (name, category, time, remind, color, starred, sort_order) VALUES
+('早起', '作息', '07:00', 1, '#3b82f6', 1, 1),
+('阅读30分钟', '学习', '20:00', 1, '#10b981', 0, 0),
+('运动锻炼', '健康', '18:00', 0, '#f59e0b', 0, 0),
+('喝8杯水', '健康', NULL, 0, '#06b6d4', 1, 2);

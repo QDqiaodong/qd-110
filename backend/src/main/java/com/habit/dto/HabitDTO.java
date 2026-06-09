@@ -16,4 +16,8 @@ public class HabitDTO {
     private Boolean remind;
     
     private String color;
+    
+    private Boolean starred;
+    
+    private Integer sortOrder;
 }

@@ -28,6 +28,8 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
         }
         
         List<Habit> habits = this.list(new LambdaQueryWrapper<Habit>()
+                .orderByDesc(Habit::getStarred)
+                .orderByAsc(Habit::getSortOrder)
                 .orderByDesc(Habit::getCreateTime));
         
         redisTemplate.opsForValue().set(HABIT_CACHE_KEY, habits, CACHE_EXPIRE_HOURS, TimeUnit.HOURS);
@@ -41,6 +43,15 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
         habit.setTime(dto.getTime());
         habit.setRemind(dto.getRemind() != null ? dto.getRemind() : false);
         habit.setColor(dto.getColor() != null ? dto.getColor() : "#3b82f6");
+        habit.setStarred(dto.getStarred() != null ? dto.getStarred() : false);
+        
+        if (dto.getStarred() != null && dto.getStarred()) {
+            Integer maxSort = this.getMaxStarredSortOrder();
+            habit.setSortOrder(maxSort != null ? maxSort + 1 : 1);
+        } else {
+            habit.setSortOrder(0);
+        }
+        
         this.save(habit);
         
         clearCache();
@@ -52,11 +63,30 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
         if (habit == null) {
             return null;
         }
+        
+        boolean starChanged = false;
+        boolean wasStarred = habit.getStarred() != null && habit.getStarred();
+        
         if (dto.getName() != null) habit.setName(dto.getName());
         if (dto.getCategory() != null) habit.setCategory(dto.getCategory());
         if (dto.getTime() != null) habit.setTime(dto.getTime());
         if (dto.getRemind() != null) habit.setRemind(dto.getRemind());
         if (dto.getColor() != null) habit.setColor(dto.getColor());
+        if (dto.getStarred() != null) {
+            habit.setStarred(dto.getStarred());
+            starChanged = true;
+        }
+        if (dto.getSortOrder() != null) habit.setSortOrder(dto.getSortOrder());
+        
+        if (starChanged) {
+            if (dto.getStarred() && !wasStarred) {
+                Integer maxSort = this.getMaxStarredSortOrder();
+                habit.setSortOrder(maxSort != null ? maxSort + 1 : 1);
+            } else if (!dto.getStarred() && wasStarred) {
+                habit.setSortOrder(0);
+            }
+        }
+        
         this.updateById(habit);
         
         clearCache();
@@ -69,6 +99,56 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
             clearCache();
         }
         return result;
+    }
+    
+    public Habit toggleStarred(Long id) {
+        Habit habit = this.getById(id);
+        if (habit == null) {
+            return null;
+        }
+        
+        boolean newStarred = !(habit.getStarred() != null && habit.getStarred());
+        habit.setStarred(newStarred);
+        
+        if (newStarred) {
+            Integer maxSort = this.getMaxStarredSortOrder();
+            habit.setSortOrder(maxSort != null ? maxSort + 1 : 1);
+        } else {
+            habit.setSortOrder(0);
+        }
+        
+        this.updateById(habit);
+        clearCache();
+        return habit;
+    }
+    
+    public boolean updateStarredOrder(List<Long> habitIds) {
+        if (habitIds == null || habitIds.isEmpty()) {
+            return false;
+        }
+        
+        for (int i = 0; i < habitIds.size(); i++) {
+            Habit habit = this.getById(habitIds.get(i));
+            if (habit != null) {
+                habit.setSortOrder(i + 1);
+                this.updateById(habit);
+            }
+        }
+        
+        clearCache();
+        return true;
+    }
+    
+    private Integer getMaxStarredSortOrder() {
+        List<Habit> starredHabits = this.list(new LambdaQueryWrapper<Habit>()
+                .eq(Habit::getStarred, true)
+                .orderByDesc(Habit::getSortOrder)
+                .last("LIMIT 1"));
+        
+        if (starredHabits != null && !starredHabits.isEmpty()) {
+            return starredHabits.get(0).getSortOrder();
+        }
+        return 0;
     }
     
     private void clearCache() {

@@ -9,6 +9,7 @@ export const useHabitStore = defineStore('habit', {
     checkins: {},
     schedules: [],
     currentSchedule: null,
+    starredOrder: [],
     templates: [
       { id: 1, name: '早起作息', items: [
         { time: '06:00', title: '起床洗漱' },
@@ -62,6 +63,27 @@ export const useHabitStore = defineStore('habit', {
       const completed = Object.values(todayCheckins).filter(v => v).length
       return Math.round((completed / state.habits.length) * 100)
     },
+    starredHabits: (state) => {
+      const today = dayjs().format('YYYY-MM-DD')
+      const todayCheckins = state.checkins[today] || {}
+      const starred = state.habits.filter(h => h.starred)
+      const orderMap = {}
+      state.starredOrder.forEach((id, index) => { orderMap[id] = index })
+      starred.sort((a, b) => {
+        const aCompleted = todayCheckins[a.id] || false
+        const bCompleted = todayCheckins[b.id] || false
+        if (aCompleted !== bCompleted) {
+          return aCompleted ? 1 : -1
+        }
+        const aOrder = orderMap[a.id] !== undefined ? orderMap[a.id] : 999
+        const bOrder = orderMap[b.id] !== undefined ? orderMap[b.id] : 999
+        return aOrder - bOrder
+      })
+      return starred
+    },
+    nonStarredHabits: (state) => {
+      return state.habits.filter(h => !h.starred)
+    },
     weekStats: (state) => {
       const stats = []
       for (let i = 6; i >= 0; i--) {
@@ -91,6 +113,7 @@ export const useHabitStore = defineStore('habit', {
           this.checkins = data.checkins || {}
           this.schedules = data.schedules || []
           this.currentSchedule = data.currentSchedule || this.templates[0]
+          this.starredOrder = data.starredOrder || []
         } else {
           this.initDefaultData()
         }
@@ -105,7 +128,8 @@ export const useHabitStore = defineStore('habit', {
           habits: this.habits,
           checkins: this.checkins,
           schedules: this.schedules,
-          currentSchedule: this.currentSchedule
+          currentSchedule: this.currentSchedule,
+          starredOrder: this.starredOrder
         }))
       } catch (e) {
         console.error('缓存保存失败', e)
@@ -114,11 +138,12 @@ export const useHabitStore = defineStore('habit', {
 
     initDefaultData() {
       this.habits = [
-        { id: 1, name: '早起', category: '作息', time: '07:00', remind: true, color: '#3b82f6' },
-        { id: 2, name: '阅读30分钟', category: '学习', time: '20:00', remind: true, color: '#10b981' },
-        { id: 3, name: '运动锻炼', category: '健康', time: '18:00', remind: false, color: '#f59e0b' },
-        { id: 4, name: '喝8杯水', category: '健康', time: '', remind: false, color: '#06b6d4' }
+        { id: 1, name: '早起', category: '作息', time: '07:00', remind: true, color: '#3b82f6', starred: true },
+        { id: 2, name: '阅读30分钟', category: '学习', time: '20:00', remind: true, color: '#10b981', starred: false },
+        { id: 3, name: '运动锻炼', category: '健康', time: '18:00', remind: false, color: '#f59e0b', starred: false },
+        { id: 4, name: '喝8杯水', category: '健康', time: '', remind: false, color: '#06b6d4', starred: true }
       ]
+      this.starredOrder = [1, 4]
       this.currentSchedule = this.templates[0]
       this.saveToCache()
     },
@@ -127,9 +152,13 @@ export const useHabitStore = defineStore('habit', {
       const newHabit = {
         id: Date.now(),
         ...habit,
-        color: habit.color || this.getRandomColor()
+        color: habit.color || this.getRandomColor(),
+        starred: habit.starred || false
       }
       this.habits.push(newHabit)
+      if (newHabit.starred) {
+        this.starredOrder.push(newHabit.id)
+      }
       this.saveToCache()
       return newHabit
     },
@@ -137,13 +166,52 @@ export const useHabitStore = defineStore('habit', {
     updateHabit(id, habit) {
       const index = this.habits.findIndex(h => h.id === id)
       if (index > -1) {
+        const oldStarred = this.habits[index].starred
         this.habits[index] = { ...this.habits[index], ...habit }
+        if (habit.starred !== undefined && habit.starred !== oldStarred) {
+          if (habit.starred) {
+            if (!this.starredOrder.includes(id)) {
+              this.starredOrder.push(id)
+            }
+          } else {
+            this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+          }
+        }
         this.saveToCache()
       }
     },
 
     deleteHabit(id) {
       this.habits = this.habits.filter(h => h.id !== id)
+      this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+      this.saveToCache()
+    },
+
+    toggleStarred(id) {
+      const habit = this.habits.find(h => h.id === id)
+      if (habit) {
+        habit.starred = !habit.starred
+        if (habit.starred) {
+          if (!this.starredOrder.includes(id)) {
+            this.starredOrder.push(id)
+          }
+        } else {
+          this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+        }
+        this.saveToCache()
+      }
+    },
+
+    updateStarredOrder(newOrder) {
+      this.starredOrder = newOrder
+      this.saveToCache()
+    },
+
+    moveStarredHabit(fromIndex, toIndex) {
+      const result = [...this.starredOrder]
+      const [removed] = result.splice(fromIndex, 1)
+      result.splice(toIndex, 0, removed)
+      this.starredOrder = result
       this.saveToCache()
     },
 
