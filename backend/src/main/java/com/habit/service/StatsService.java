@@ -4,6 +4,7 @@ import com.habit.entity.Checkin;
 import com.habit.entity.Habit;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.serializer.SerializationException;
 import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.*;
@@ -27,9 +28,13 @@ public class StatsService {
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getWeekStats() {
         String cacheKey = STATS_CACHE_PREFIX + "week";
-        Object cached = redisTemplate.opsForValue().get(cacheKey);
-        if (cached != null) {
-            return (List<Map<String, Object>>) cached;
+        try {
+            Object cached = redisTemplate.opsForValue().get(cacheKey);
+            if (cached != null) {
+                return (List<Map<String, Object>>) cached;
+            }
+        } catch (SerializationException e) {
+            redisTemplate.delete(cacheKey);
         }
         
         LocalDate endDate = LocalDate.now();
@@ -68,9 +73,13 @@ public class StatsService {
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getMonthStats() {
         String cacheKey = STATS_CACHE_PREFIX + "month";
-        Object cached = redisTemplate.opsForValue().get(cacheKey);
-        if (cached != null) {
-            return (List<Map<String, Object>>) cached;
+        try {
+            Object cached = redisTemplate.opsForValue().get(cacheKey);
+            if (cached != null) {
+                return (List<Map<String, Object>>) cached;
+            }
+        } catch (SerializationException e) {
+            redisTemplate.delete(cacheKey);
         }
         
         LocalDate endDate = LocalDate.now();

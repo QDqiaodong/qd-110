@@ -9,31 +9,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 @Service
 public class HabitService extends ServiceImpl<HabitMapper, Habit> {
     
     private static final String HABIT_CACHE_KEY = "habit:list";
-    private static final long CACHE_EXPIRE_HOURS = 1;
     
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
     
-    @SuppressWarnings("unchecked")
     public List<Habit> getHabitList() {
-        Object cached = redisTemplate.opsForValue().get(HABIT_CACHE_KEY);
-        if (cached != null) {
-            return (List<Habit>) cached;
-        }
-        
-        List<Habit> habits = this.list(new LambdaQueryWrapper<Habit>()
+        return this.list(new LambdaQueryWrapper<Habit>()
                 .orderByDesc(Habit::getStarred)
                 .orderByAsc(Habit::getSortOrder)
                 .orderByDesc(Habit::getCreateTime));
-        
-        redisTemplate.opsForValue().set(HABIT_CACHE_KEY, habits, CACHE_EXPIRE_HOURS, TimeUnit.HOURS);
-        return habits;
     }
     
     public Habit createHabit(HabitDTO dto) {
