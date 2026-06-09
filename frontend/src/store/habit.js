@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import dayjs from 'dayjs'
+import { habitApi } from '@/utils/request'
 
 const CACHE_KEY = 'habit_assistant_cache'
 
@@ -259,88 +260,135 @@ export const useHabitStore = defineStore('habit', {
       return colors[Math.floor(Math.random() * colors.length)]
     },
 
-    archiveHabit(id) {
-      const index = this.habits.findIndex(h => h.id === id)
-      if (index > -1) {
-        const habit = { ...this.habits[index], archived: true, archiveTime: new Date().toISOString() }
-        this.habits.splice(index, 1)
-        this.archivedHabits.unshift(habit)
-        this.starredOrder = this.starredOrder.filter(sid => sid !== id)
-        this.saveToCache()
-        return habit
+    async archiveHabit(id) {
+      try {
+        const res = await habitApi.archive(id)
+        if (res.code === 0 && res.data) {
+          const index = this.habits.findIndex(h => h.id === id)
+          if (index > -1) {
+            this.habits.splice(index, 1)
+          }
+          const archivedHabit = res.data
+          const existsIndex = this.archivedHabits.findIndex(h => h.id === id)
+          if (existsIndex > -1) {
+            this.archivedHabits[existsIndex] = archivedHabit
+          } else {
+            this.archivedHabits.unshift(archivedHabit)
+          }
+          this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+          this.saveToCache()
+          return archivedHabit
+        }
+      } catch (e) {
+        console.error('归档失败', e)
       }
       return null
     },
 
-    unarchiveHabit(id) {
-      const index = this.archivedHabits.findIndex(h => h.id === id)
-      if (index > -1) {
-        const habit = { ...this.archivedHabits[index], archived: false, archiveTime: null }
-        this.archivedHabits.splice(index, 1)
-        if (habit.starred) {
-          this.starredOrder.push(habit.id)
+    async unarchiveHabit(id) {
+      try {
+        const res = await habitApi.unarchive(id)
+        if (res.code === 0 && res.data) {
+          const index = this.archivedHabits.findIndex(h => h.id === id)
+          if (index > -1) {
+            this.archivedHabits.splice(index, 1)
+          }
+          const habit = res.data
+          const existsIndex = this.habits.findIndex(h => h.id === id)
+          if (existsIndex > -1) {
+            this.habits[existsIndex] = habit
+          } else {
+            this.habits.push(habit)
+          }
+          if (habit.starred && !this.starredOrder.includes(id)) {
+            this.starredOrder.push(id)
+          }
+          this.saveToCache()
+          return habit
         }
-        this.habits.push(habit)
-        this.saveToCache()
-        return habit
+      } catch (e) {
+        console.error('取消归档失败', e)
       }
       return null
+    },
+
+    async loadArchivedHabits() {
+      try {
+        const res = await habitApi.getArchivedList()
+        if (res.code === 0 && res.data) {
+          this.archivedHabits = res.data
+          this.saveToCache()
+          return this.archivedHabits
+        }
+      } catch (e) {
+        console.error('加载归档列表失败', e)
+      }
+      return this.archivedHabits
     },
 
     getHabitCheckinStats(habitId) {
-      let totalDays = 0
-      let completedDays = 0
-      let currentStreak = 0
-      let maxStreak = 0
-      const dates = []
-
+      const completedDates = []
+      
       Object.keys(this.checkins).forEach(date => {
-        if (this.checkins[date][habitId]) {
-          totalDays++
-          completedDays++
-          dates.push(date)
-        } else {
-          totalDays++
+        if (this.checkins[date] && this.checkins[date][habitId] === true) {
+          completedDates.push(date)
         }
       })
-
-      dates.sort()
       
-      if (dates.length > 0) {
-        let streak = 1
-        maxStreak = 1
-        for (let i = 1; i < dates.length; i++) {
-          const prev = dayjs(dates[i - 1])
-          const curr = dayjs(dates[i])
-          if (curr.diff(prev, 'day') === 1) {
-            streak++
-            if (streak > maxStreak) {
-              maxStreak = streak
-            }
-          } else {
-            streak = 1
-          }
-        }
-
-        const today = dayjs().format('YYYY-MM-DD')
-        const yesterday = dayjs().subtract(1, 'day').format('YYYY-MM-DD')
-        if (dates.includes(today)) {
-          currentStreak = 1
-          let d = dayjs(today).subtract(1, 'day')
-          while (dates.includes(d.format('YYYY-MM-DD'))) {
-            currentStreak++
-            d = d.subtract(1, 'day')
-          }
-        } else if (dates.includes(yesterday)) {
-          currentStreak = 1
-          let d = dayjs(yesterday).subtract(1, 'day')
-          while (dates.includes(d.format('YYYY-MM-DD'))) {
-            currentStreak++
-            d = d.subtract(1, 'day')
-          }
+      completedDates.sort()
+      
+      const completedDays = completedDates.length
+      
+      if (completedDays === 0) {
+        return {
+          totalDays: 0,
+          completedDays: 0,
+          currentStreak: 0,
+          maxStreak: 0,
+          completionRate: 0
         }
       }
-
+      
+      const firstDate = dayjs(completedDates[0])
+      const today = dayjs()
+      const totalDays = today.diff(firstDate, 'day') + 1
+      
+      let maxStreak = 0
+      let currentStreak = 0
+      
+      let streak = 1
+      maxStreak = 1
+      for (let i = 1; i < completedDates.length; i++) {
+        const prev = dayjs(completedDates[i - 1])
+        const curr = dayjs(completedDates[i])
+        if (curr.diff(prev, 'day') === 1) {
+          streak++
+          if (streak > maxStreak) {
+            maxStreak = streak
+          }
+        } else {
+          streak = 1
+        }
+      }
+      
+      const todayStr = today.format('YYYY-MM-DD')
+      const yesterdayStr = today.subtract(1, 'day').format('YYYY-MM-DD')
+      if (completedDates.includes(todayStr)) {
+        currentStreak = 1
+        let d = today.subtract(1, 'day')
+        while (completedDates.includes(d.format('YYYY-MM-DD'))) {
+          currentStreak++
+          d = d.subtract(1, 'day')
+        }
+      } else if (completedDates.includes(yesterdayStr)) {
+        currentStreak = 1
+        let d = today.subtract(2, 'day')
+        while (completedDates.includes(d.format('YYYY-MM-DD'))) {
+          currentStreak++
+          d = d.subtract(1, 'day')
+        }
+      }
+      
       return {
         totalDays,
         completedDays,
@@ -348,6 +396,25 @@ export const useHabitStore = defineStore('habit', {
         maxStreak,
         completionRate: totalDays > 0 ? Math.round((completedDays / totalDays) * 100) : 0
       }
+    },
+
+    getHabitCheckinDetail(habitId, days = 30) {
+      const detail = []
+      const today = dayjs()
+      
+      for (let i = days - 1; i >= 0; i--) {
+        const date = today.subtract(i, 'day')
+        const dateStr = date.format('YYYY-MM-DD')
+        const completed = this.checkins[dateStr]?.[habitId] === true
+        detail.push({
+          date: dateStr,
+          label: date.format('MM/DD'),
+          weekday: date.format('dd'),
+          completed
+        })
+      }
+      
+      return detail
     }
   }
 })

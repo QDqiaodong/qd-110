@@ -208,9 +208,11 @@ const archiveHabit = async () => {
       message: `确定要归档「${editingHabit.value.name}」吗？归档后不再出现在打卡和清单中，但历史数据仍可在归档页查看。`,
       confirmButtonColor: '#3b82f6'
     })
-    store.archiveHabit(editingHabit.value.id)
-    showToast('已归档')
-    closeForm()
+    const result = await store.archiveHabit(editingHabit.value.id)
+    if (result) {
+      showToast('已归档')
+      closeForm()
+    }
   } catch (e) {}
 }
 

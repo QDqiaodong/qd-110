@@ -27,6 +27,7 @@ public class Habit {
     
     private Boolean archived;
     
+    @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.IGNORED)
     private LocalDateTime archiveTime;
     
     @TableField(fill = FieldFill.INSERT)
