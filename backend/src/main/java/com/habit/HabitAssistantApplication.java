@@ -1,0 +1,16 @@
+package com.habit;
+
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cache.annotation.EnableCaching;
+
+@SpringBootApplication
+@EnableCaching
+@MapperScan("com.habit.mapper")
+public class HabitAssistantApplication {
+    
+    public static void main(String[] args) {
+        SpringApplication.run(HabitAssistantApplication.class, args);
+    }
+}
