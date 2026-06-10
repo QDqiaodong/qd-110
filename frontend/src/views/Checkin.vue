@@ -5,7 +5,7 @@
         <div class="title">今日打卡</div>
         <div class="subtitle">{{ todayStr }} · 完成率 {{ store.completionRate }}%</div>
       </div>
-      <van-circle v-model="completionRate" :rate="store.completionRate" :stroke-width="6" size="50">
+      <van-circle :rate="store.completionRate" :stroke-width="6" size="50">
         <span class="rate-text">{{ store.completionRate }}%</span>
       </van-circle>
     </div>
@@ -187,12 +187,12 @@ import dayjs from 'dayjs'
 import { showToast } from 'vant'
 
 const store = useHabitStore()
-const completionRate = ref(0)
 const showAdd = ref(false)
 const showCategory = ref(false)
 const showTime = ref(false)
 const isSorting = ref(false)
 const dragIndex = ref(-1)
+const isToggling = ref(false)
 
 const todayStr = computed(() => dayjs().format('YYYY年MM月DD日 dddd'))
 
@@ -210,7 +210,6 @@ const form = ref({
 
 onMounted(() => {
   store.loadFromCache()
-  completionRate.value = store.completionRate
 })
 
 const isChecked = (habitId) => {
@@ -218,9 +217,14 @@ const isChecked = (habitId) => {
 }
 
 const toggleCheckin = (habitId) => {
+  if (isToggling.value) return
+  isToggling.value = true
   store.toggleCheckin(habitId)
-  completionRate.value = store.completionRate
-  showToast(isChecked(habitId) ? '已完成 ✨' : '已取消')
+  const checked = isChecked(habitId)
+  showToast(checked ? '已完成 ✨' : '已取消')
+  setTimeout(() => {
+    isToggling.value = false
+  }, 200)
 }
 
 const addHabit = () => {

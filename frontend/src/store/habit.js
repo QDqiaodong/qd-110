@@ -69,7 +69,7 @@ export const useHabitStore = defineStore('habit', {
     starredHabits: (state) => {
       const today = dayjs().format('YYYY-MM-DD')
       const todayCheckins = state.checkins[today] || {}
-      const starred = state.habits.filter(h => h.starred)
+      const starred = state.habits.filter(h => h.starred).map(h => ({ ...h }))
       const orderMap = {}
       state.starredOrder.forEach((id, index) => { orderMap[id] = index })
       starred.sort((a, b) => {
@@ -224,10 +224,12 @@ export const useHabitStore = defineStore('habit', {
 
     toggleCheckin(habitId, date = null) {
       const targetDate = date || dayjs().format('YYYY-MM-DD')
-      if (!this.checkins[targetDate]) {
-        this.checkins[targetDate] = {}
+      const dateCheckins = { ...(this.checkins[targetDate] || {}) }
+      dateCheckins[habitId] = !dateCheckins[habitId]
+      this.checkins = {
+        ...this.checkins,
+        [targetDate]: dateCheckins
       }
-      this.checkins[targetDate][habitId] = !this.checkins[targetDate][habitId]
       this.saveToCache()
     },
 
