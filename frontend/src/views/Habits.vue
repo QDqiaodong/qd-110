@@ -13,52 +13,118 @@
       </div>
     </div>
 
-    <div class="category-tabs">
-      <van-tabs v-model:active="activeCategory" sticky line-width="24">
-        <van-tab v-for="cat in categories" :key="cat" :title="cat" :name="cat" />
-      </van-tabs>
+    <div class="view-switch">
+      <van-radio-group v-model="viewMode" direction="horizontal" shape="round">
+        <van-radio name="category">
+          <span class="radio-text">📂 按分类</span>
+        </van-radio>
+        <van-radio name="time">
+          <span class="radio-text">⏰ 按时段</span>
+        </van-radio>
+      </van-radio-group>
     </div>
 
-    <div class="habit-list">
-      <div v-if="filteredHabits.length === 0" class="empty-state">
-        <div class="empty-icon">📝</div>
-        <div class="empty-text">该分类暂无习惯</div>
+    <div v-if="viewMode === 'category'" class="category-view">
+      <div class="category-tabs">
+        <van-tabs v-model:active="activeCategory" sticky line-width="24">
+          <van-tab v-for="cat in categories" :key="cat" :title="cat" :name="cat" />
+        </van-tabs>
       </div>
 
-      <div
-        v-for="habit in filteredHabits"
-        :key="habit.id"
-        class="habit-card"
-        @click="editHabit(habit)"
-      >
-        <div class="habit-left">
-          <div class="habit-icon" :style="{ background: habit.color + '20', color: habit.color }">
-            {{ getCategoryIcon(habit.category) }}
-          </div>
-          <div class="habit-info">
-              <div class="habit-name">
-                {{ habit.name }}
-                <span v-if="habit.starred" class="star-badge">⭐</span>
-                <span v-if="getHabitChallenge(habit.id)" class="challenge-badge">
-                  🔥 {{ getChallengeDay(habit.id) }}天
-                </span>
+      <div class="habit-list">
+        <div v-if="filteredHabits.length === 0" class="empty-state">
+          <div class="empty-icon">📝</div>
+          <div class="empty-text">该分类暂无习惯</div>
+        </div>
+
+        <div
+          v-for="habit in filteredHabits"
+          :key="habit.id"
+          class="habit-card"
+          @click="editHabit(habit)"
+        >
+          <div class="habit-left">
+            <div class="habit-icon" :style="{ background: habit.color + '20', color: habit.color }">
+              {{ getCategoryIcon(habit.category) }}
+            </div>
+            <div class="habit-info">
+                <div class="habit-name">
+                  {{ habit.name }}
+                  <span v-if="habit.starred" class="star-badge">⭐</span>
+                  <span v-if="getHabitChallenge(habit.id)" class="challenge-badge">
+                    🔥 {{ getChallengeDay(habit.id) }}天
+                  </span>
+                </div>
+                <div class="habit-meta">
+                  <span class="habit-category">{{ habit.category }}</span>
+                  <span v-if="habit.time" class="habit-time">⏰ {{ habit.time }}</span>
+                  <span v-if="habit.remind" class="habit-remind">🔔 提醒</span>
+                </div>
               </div>
-              <div class="habit-meta">
-                <span class="habit-category">{{ habit.category }}</span>
-                <span v-if="habit.time" class="habit-time">⏰ {{ habit.time }}</span>
-                <span v-if="habit.remind" class="habit-remind">🔔 提醒</span>
+          </div>
+          <div class="habit-actions">
+            <van-icon
+              :name="habit.starred ? 'star' : 'star-o'"
+              :class="{ 'star-active': habit.starred }"
+              class="star-icon"
+              @click.stop="toggleStar(habit.id)"
+            />
+            <van-icon name="arrow" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="time-view">
+      <div v-for="group in timePeriodGroupsForList" :key="group.key" class="period-group">
+        <div v-if="group.habits.length > 0" class="period-section">
+          <div class="period-header">
+            <div class="period-title">{{ group.title }}</div>
+            <div class="period-subtitle">{{ group.subtitle }} · {{ group.habits.length }}项</div>
+          </div>
+          <div class="period-list">
+            <div
+              v-for="habit in group.habits"
+              :key="habit.id"
+              class="habit-card period-card"
+              @click="editHabit(habit)"
+            >
+              <div class="habit-left">
+                <div class="habit-icon" :style="{ background: habit.color + '20', color: habit.color }">
+                  {{ getCategoryIcon(habit.category) }}
+                </div>
+                <div class="habit-info">
+                    <div class="habit-name">
+                      {{ habit.name }}
+                      <span v-if="habit.starred" class="star-badge">⭐</span>
+                      <span v-if="getHabitChallenge(habit.id)" class="challenge-badge">
+                        🔥 {{ getChallengeDay(habit.id) }}天
+                      </span>
+                    </div>
+                    <div class="habit-meta">
+                      <span class="habit-category">{{ habit.category }}</span>
+                      <span v-if="habit.time" class="habit-time">⏰ {{ habit.time }}</span>
+                      <span v-if="habit.remind" class="habit-remind">🔔 提醒</span>
+                    </div>
+                  </div>
+              </div>
+              <div class="habit-actions">
+                <van-icon
+                  :name="habit.starred ? 'star' : 'star-o'"
+                  :class="{ 'star-active': habit.starred }"
+                  class="star-icon"
+                  @click.stop="toggleStar(habit.id)"
+                />
+                <van-icon name="arrow" />
               </div>
             </div>
+          </div>
         </div>
-        <div class="habit-actions">
-          <van-icon
-            :name="habit.starred ? 'star' : 'star-o'"
-            :class="{ 'star-active': habit.starred }"
-            class="star-icon"
-            @click.stop="toggleStar(habit.id)"
-          />
-          <van-icon name="arrow" />
-        </div>
+      </div>
+
+      <div v-if="store.habits.length === 0" class="empty-state">
+        <div class="empty-icon">📝</div>
+        <div class="empty-text">暂无习惯</div>
       </div>
     </div>
 
@@ -158,12 +224,24 @@ import { showToast, showConfirmDialog } from 'vant'
 const store = useHabitStore()
 const challengeStore = useChallengeStore()
 const router = useRouter()
+const viewMode = ref('category')
 const activeCategory = ref('全部')
 const showAdd = ref(false)
 const showCategory = ref(false)
 const showTime = ref(false)
 const editingHabit = ref(null)
 const pickerTime = ref(['00', '00'])
+
+const timePeriodGroupsForList = computed(() => {
+  return store.timePeriodGroups.map(group => ({
+    ...group,
+    habits: group.habits.slice().sort((a, b) => {
+      if (a.starred && !b.starred) return -1
+      if (!a.starred && b.starred) return 1
+      return (a.time || '99:99').localeCompare(b.time || '99:99')
+    })
+  }))
+})
 
 const categories = ['全部', '生活', '学习', '作息', '健康', '工作', '运动', '阅读', '其他']
 const categoryList = ['生活', '学习', '作息', '健康', '工作', '运动', '阅读', '其他']
@@ -339,6 +417,105 @@ const goToChallengeFromEdit = () => {
 </script>
 
 <style lang="scss" scoped>
+.view-switch {
+  margin-bottom: 16px;
+  
+  :deep(.van-radio-group) {
+    background: #f3f4f6;
+    padding: 4px;
+    border-radius: 20px;
+    gap: 4px;
+  }
+  
+  :deep(.van-radio) {
+    flex: 1;
+    justify-content: center;
+    padding: 8px 0;
+    
+    .van-radio__icon {
+      display: none;
+    }
+    
+    .van-radio__label {
+      margin-left: 0 !important;
+    }
+  }
+  
+  :deep(.van-radio--checked) {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    
+    .radio-text {
+      color: $primary-color;
+      font-weight: 600;
+    }
+  }
+}
+
+.radio-text {
+  font-size: 14px;
+  color: $text-secondary;
+}
+
+.time-view {
+  .period-group {
+    margin-bottom: 20px;
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+  
+  .period-section {
+    .period-header {
+      margin-bottom: 12px;
+    }
+    
+    .period-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: $text-primary;
+      margin-bottom: 2px;
+    }
+    
+    .period-subtitle {
+      font-size: 12px;
+      color: $text-secondary;
+    }
+  }
+  
+  .period-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .period-card {
+    border-left: 3px solid transparent;
+    
+    &:active {
+      background: #f9fafb;
+    }
+  }
+  
+  .period-group:nth-child(1) .period-card {
+    border-left-color: #f97316;
+  }
+  
+  .period-group:nth-child(2) .period-card {
+    border-left-color: #3b82f6;
+  }
+  
+  .period-group:nth-child(3) .period-card {
+    border-left-color: #8b5cf6;
+  }
+  
+  .period-group:nth-child(4) .period-card {
+    border-left-color: #9ca3af;
+  }
+}
+
 .header-actions {
   display: flex;
   align-items: center;

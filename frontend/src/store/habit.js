@@ -90,6 +90,75 @@ export const useHabitStore = defineStore('habit', {
     nonStarredHabits: (state) => {
       return state.habits.filter(h => !h.starred)
     },
+    getTimePeriod: () => (time) => {
+      if (!time) return 'other'
+      const hour = parseInt(time.split(':')[0], 10)
+      if (hour >= 4 && hour < 10) return 'morning'
+      if (hour >= 10 && hour < 18) return 'daytime'
+      return 'night'
+    },
+    morningHabits: (state, getters) => {
+      const habits = state.habits.filter(h => getters.getTimePeriod(h.time) === 'morning')
+      return habits.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'))
+    },
+    daytimeHabits: (state, getters) => {
+      const habits = state.habits.filter(h => getters.getTimePeriod(h.time) === 'daytime')
+      return habits.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'))
+    },
+    nighttimeHabits: (state, getters) => {
+      const habits = state.habits.filter(h => getters.getTimePeriod(h.time) === 'night')
+      return habits.sort((a, b) => {
+        const aTime = a.time || '99:99'
+        const bTime = b.time || '99:99'
+        const aHour = parseInt(aTime.split(':')[0], 10)
+        const bHour = parseInt(bTime.split(':')[0], 10)
+        const aSort = aHour >= 18 ? aHour : aHour + 24
+        const bSort = bHour >= 18 ? bHour : bHour + 24
+        return aSort - bSort
+      })
+    },
+    otherTimeHabits: (state, getters) => {
+      return state.habits.filter(h => getters.getTimePeriod(h.time) === 'other')
+    },
+    timePeriodGroups: (state, getters) => {
+      const today = dayjs().format('YYYY-MM-DD')
+      const todayCheckins = state.checkins[today] || {}
+      
+      const sortByTimeAndCompletion = (habits) => {
+        const sorted = [...habits].sort((a, b) => {
+          const aCompleted = todayCheckins[a.id] || false
+          const bCompleted = todayCheckins[b.id] || false
+          if (aCompleted !== bCompleted) {
+            return aCompleted ? 1 : -1
+          }
+          return (a.time || '99:99').localeCompare(b.time || '99:99')
+        })
+        return sorted
+      }
+
+      const morning = sortByTimeAndCompletion(getters.morningHabits)
+      const daytime = sortByTimeAndCompletion(getters.daytimeHabits)
+      const night = getters.nighttimeHabits.map(h => ({ ...h })).sort((a, b) => {
+        const aCompleted = todayCheckins[a.id] || false
+        const bCompleted = todayCheckins[b.id] || false
+        if (aCompleted !== bCompleted) {
+          return aCompleted ? 1 : -1
+        }
+        const aHour = parseInt((a.time || '99:99').split(':')[0], 10)
+        const bHour = parseInt((b.time || '99:99').split(':')[0], 10)
+        const aSort = aHour >= 18 ? aHour : aHour + 24
+        const bSort = bHour >= 18 ? bHour : bHour + 24
+        return aSort - bSort
+      })
+      const other = sortByTimeAndCompletion(getters.otherTimeHabits)
+
+      return [
+        { key: 'morning', title: '🌅 清晨', subtitle: '04:00 - 10:00', habits: morning },
+        { key: 'daytime', title: '☀️ 白天', subtitle: '10:00 - 18:00', habits: daytime },
+        { key: 'night', title: '🌙 夜间', subtitle: '18:00 - 04:00', habits: night },
+        { key: 'other', title: '📌 其他', subtitle: '未设置时间', habits: other }
+      ]
+    },
     weekStats: (state) => {
       const stats = []
       const activeIds = state.habits.map(h => h.id)
