@@ -164,6 +164,27 @@
       />
     </van-popup>
 
+    <van-popup v-model:show="showMilestoneModal" round position="center" :style="{ width: '80%', maxWidth: '320px' }" class="milestone-popup">
+      <div class="milestone-modal">
+        <div class="milestone-celebration">
+          <div class="celebration-icon">{{ milestoneIcon }}</div>
+          <div class="celebration-title">🎉 恭喜达成！</div>
+          <div class="celebration-subtitle">{{ milestoneText }}</div>
+        </div>
+        <div class="milestone-message">
+          {{ milestoneMessage }}
+        </div>
+        <van-button 
+          block 
+          type="primary" 
+          round
+          @click="closeMilestoneModal"
+        >
+          继续加油
+        </van-button>
+      </div>
+    </van-popup>
+
     <van-button
       v-if="store.habits.length > 0"
       class="floating-add-button"
@@ -183,16 +204,19 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useHabitStore } from '@/store/habit'
+import { useChallengeStore } from '@/store/challenge'
 import dayjs from 'dayjs'
 import { showToast } from 'vant'
 
 const store = useHabitStore()
+const challengeStore = useChallengeStore()
 const showAdd = ref(false)
 const showCategory = ref(false)
 const showTime = ref(false)
 const isSorting = ref(false)
 const dragIndex = ref(-1)
 const isToggling = ref(false)
+const showMilestoneModal = ref(false)
 
 const todayStr = computed(() => dayjs().format('YYYY年MM月DD日 dddd'))
 
@@ -210,7 +234,13 @@ const form = ref({
 
 onMounted(() => {
   store.loadFromCache()
+  challengeStore.loadFromCache()
+  loadChallenges()
 })
+
+const loadChallenges = async () => {
+  await challengeStore.loadActiveChallenges()
+}
 
 const isChecked = (habitId) => {
   return store.todayCheckins[habitId] || false
@@ -222,6 +252,19 @@ const toggleCheckin = (habitId) => {
   store.toggleCheckin(habitId)
   const checked = isChecked(habitId)
   showToast(checked ? '已完成 ✨' : '已取消')
+  
+  if (checked) {
+    setTimeout(async () => {
+      const challenge = challengeStore.getChallengeByHabitId(habitId)
+      if (challenge) {
+        await challengeStore.refreshChallenge(challenge.id)
+        if (challengeStore.showMilestoneModal) {
+          showMilestoneModal.value = true
+        }
+      }
+    }, 300)
+  }
+  
   setTimeout(() => {
     isToggling.value = false
   }, 200)
@@ -270,6 +313,38 @@ const onDragOver = (e, index) => {
 
 const onDragEnd = () => {
   dragIndex.value = -1
+}
+
+const milestoneIcon = computed(() => {
+  const type = challengeStore.milestoneType
+  if (type === 7) return '🌟'
+  if (type === 14) return '🏆'
+  if (type === 21) return '👑'
+  if (type === 'complete') return '🎊'
+  return '🎉'
+})
+
+const milestoneText = computed(() => {
+  const type = challengeStore.milestoneType
+  if (type === 7) return '一周达成'
+  if (type === 14) return '两周坚持'
+  if (type === 21) return '习惯养成'
+  if (type === 'complete') return '挑战成功'
+  return ''
+})
+
+const milestoneMessage = computed(() => {
+  const type = challengeStore.milestoneType
+  if (type === 7) return '太棒了！你已经坚持了一周，这是一个很好的开始！继续保持，你正在养成一个好习惯！'
+  if (type === 14) return '两周了！你已经证明了自己的毅力。习惯正在慢慢形成，再加把劲！'
+  if (type === 21) return '恭喜你！21天挑战成功！这个习惯已经成为你生活的一部分了！'
+  if (type === 'complete') return '你成功完成了21天挑战！这个习惯已经深深植根于你的日常生活中。继续保持，让好习惯伴你成长！'
+  return ''
+})
+
+const closeMilestoneModal = () => {
+  showMilestoneModal.value = false
+  challengeStore.closeMilestoneModal()
 }
 </script>
 
@@ -499,5 +574,52 @@ const onDragEnd = () => {
   bottom: 88px;
   z-index: 10;
   box-shadow: 0 10px 24px rgba(59, 130, 246, 0.24);
+}
+
+.milestone-popup {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.milestone-modal {
+  padding: 30px 24px;
+  text-align: center;
+  background: #fff;
+  border-radius: 16px;
+}
+
+.milestone-celebration {
+  margin-bottom: 20px;
+}
+
+.celebration-icon {
+  font-size: 64px;
+  margin-bottom: 12px;
+  animation: bounce 0.6s ease-in-out;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+.celebration-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: $text-primary;
+  margin-bottom: 8px;
+}
+
+.celebration-subtitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #f59e0b;
+}
+
+.milestone-message {
+  font-size: 14px;
+  color: $text-secondary;
+  line-height: 1.6;
+  margin-bottom: 24px;
 }
 </style>

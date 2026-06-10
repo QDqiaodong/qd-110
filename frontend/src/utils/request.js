@@ -54,4 +54,15 @@ export const statsApi = {
   getMonthStats: () => request.get('/stats/month')
 }
 
+export const challengeApi = {
+  getActiveList: () => request.get('/challenges/active'),
+  getHistory: () => request.get('/challenges/history'),
+  getByHabit: (habitId) => request.get(`/challenges/habit/${habitId}`),
+  getDetail: (id) => request.get(`/challenges/${id}`),
+  getStats: (id) => request.get(`/challenges/${id}/stats`),
+  start: (habitId, totalDays = 21) => request.post('/challenges', { habitId, totalDays }),
+  refresh: (id) => request.post(`/challenges/${id}/refresh`),
+  giveUp: (id) => request.post(`/challenges/${id}/give-up`)
+}
+
 export default request

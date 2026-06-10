@@ -36,16 +36,19 @@
             {{ getCategoryIcon(habit.category) }}
           </div>
           <div class="habit-info">
-            <div class="habit-name">
-              {{ habit.name }}
-              <span v-if="habit.starred" class="star-badge">⭐</span>
+              <div class="habit-name">
+                {{ habit.name }}
+                <span v-if="habit.starred" class="star-badge">⭐</span>
+                <span v-if="getHabitChallenge(habit.id)" class="challenge-badge">
+                  🔥 {{ getChallengeDay(habit.id) }}天
+                </span>
+              </div>
+              <div class="habit-meta">
+                <span class="habit-category">{{ habit.category }}</span>
+                <span v-if="habit.time" class="habit-time">⏰ {{ habit.time }}</span>
+                <span v-if="habit.remind" class="habit-remind">🔔 提醒</span>
+              </div>
             </div>
-            <div class="habit-meta">
-              <span class="habit-category">{{ habit.category }}</span>
-              <span v-if="habit.time" class="habit-time">⏰ {{ habit.time }}</span>
-              <span v-if="habit.remind" class="habit-remind">🔔 提醒</span>
-            </div>
-          </div>
         </div>
         <div class="habit-actions">
           <van-icon
@@ -96,6 +99,22 @@
             </van-field>
           </van-cell-group>
           <div class="form-actions">
+            <van-button 
+              v-if="editingHabit && !getHabitChallenge(editingHabit.id)" 
+              round block type="warning" 
+              style="margin-bottom: 10px" 
+              @click="startChallenge(editingHabit)"
+            >
+              🔥 发起21天挑战
+            </van-button>
+            <van-button 
+              v-if="editingHabit && getHabitChallenge(editingHabit.id)" 
+              round block type="primary" 
+              style="margin-bottom: 10px" 
+              @click="goToChallengeFromEdit"
+            >
+              查看挑战进度
+            </van-button>
             <van-button v-if="editingHabit" round block type="default" style="margin-bottom: 10px" @click="archiveHabit">
               归档习惯
             </van-button>
@@ -133,9 +152,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useHabitStore } from '@/store/habit'
+import { useChallengeStore } from '@/store/challenge'
 import { showToast, showConfirmDialog } from 'vant'
 
 const store = useHabitStore()
+const challengeStore = useChallengeStore()
 const router = useRouter()
 const activeCategory = ref('全部')
 const showAdd = ref(false)
@@ -163,7 +184,13 @@ const filteredHabits = computed(() => {
 
 onMounted(() => {
   store.loadFromCache()
+  challengeStore.loadFromCache()
+  loadChallenges()
 })
+
+const loadChallenges = async () => {
+  await challengeStore.loadActiveChallenges()
+}
 
 const editHabit = (habit) => {
   editingHabit.value = habit
@@ -230,6 +257,48 @@ const getCategoryIcon = (category) => {
     '工作': '💼', '运动': '🏃', '阅读': '📖', '其他': '✨'
   }
   return icons[category] || '✨'
+}
+
+const getHabitChallenge = (habitId) => {
+  return challengeStore.getChallengeByHabitId(habitId)
+}
+
+const getChallengeDay = (habitId) => {
+  const challenge = getHabitChallenge(habitId)
+  if (!challenge) return 0
+  return challengeStore.getCurrentDay(challenge)
+}
+
+const startChallenge = async (habit) => {
+  try {
+    await showConfirmDialog({
+      title: '发起21天挑战',
+      message: `确定要为「${habit.name}」发起21天养成挑战吗？坚持就是胜利！`,
+      confirmButtonColor: habit.color || '#3b82f6'
+    })
+    
+    const challenge = await challengeStore.startChallenge(habit.id, 21)
+    if (challenge) {
+      showToast('挑战已开始，加油！')
+      router.push(`/challenge/${challenge.id}`)
+    } else {
+      showToast('发起挑战失败')
+    }
+  } catch (e) {}
+}
+
+const goToChallenge = (habitId) => {
+  const challenge = getHabitChallenge(habitId)
+  if (challenge) {
+    router.push(`/challenge/${challenge.id}`)
+  }
+}
+
+const goToChallengeFromEdit = () => {
+  if (editingHabit.value) {
+    closeForm()
+    goToChallenge(editingHabit.value.id)
+  }
 }
 </script>
 
@@ -298,10 +367,20 @@ const getCategoryIcon = (category) => {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .star-badge {
   font-size: 14px;
+}
+
+.challenge-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: linear-gradient(135deg, #f97316, #ef4444);
+  color: #fff;
+  border-radius: 10px;
+  font-weight: 500;
 }
 
 .habit-actions {
