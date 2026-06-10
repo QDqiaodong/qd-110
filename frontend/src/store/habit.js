@@ -12,6 +12,8 @@ export const useHabitStore = defineStore('habit', {
     schedules: [],
     currentSchedule: null,
     starredOrder: [],
+    habitsLoaded: false,
+    _loadHabitsVersion: 0,
     templates: [
       { id: 1, name: '早起作息', items: [
         { time: '06:00', title: '起床洗漱' },
@@ -119,6 +121,9 @@ export const useHabitStore = defineStore('habit', {
           this.schedules = data.schedules || []
           this.currentSchedule = data.currentSchedule || this.templates[0]
           this.starredOrder = data.starredOrder || []
+          if (this.habits.length > 0) {
+            this.habitsLoaded = true
+          }
         } else {
           this.initDefaultData()
         }
@@ -152,16 +157,27 @@ export const useHabitStore = defineStore('habit', {
       this.archivedHabits = []
       this.starredOrder = [1, 4]
       this.currentSchedule = this.templates[0]
+      this.habitsLoaded = true
       this.saveToCache()
     },
 
-    async loadHabits() {
+    async loadHabits(force = false) {
+      if (this.habitsLoaded && !force) {
+        return this.habits
+      }
+      
+      const requestVersion = ++this._loadHabitsVersion
+      
       try {
         const res = await habitApi.getList()
         if (res.code === 0 && res.data) {
+          if (requestVersion !== this._loadHabitsVersion) {
+            return this.habits
+          }
           this.habits = res.data
           const starred = this.habits.filter(h => h.starred).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
           this.starredOrder = starred.map(h => h.id)
+          this.habitsLoaded = true
           this.saveToCache()
           return this.habits
         }
@@ -185,6 +201,8 @@ export const useHabitStore = defineStore('habit', {
       }
       this.saveToCache()
       
+      this._loadHabitsVersion++
+      
       try {
         const res = await habitApi.create(habit)
         if (res.code === 0 && res.data) {
@@ -193,6 +211,12 @@ export const useHabitStore = defineStore('habit', {
             this.habits[index] = res.data
           }
           this.starredOrder = this.starredOrder.map(id => id === tempId ? res.data.id : id)
+          if (res.data.starred && !this.starredOrder.includes(res.data.id)) {
+            this.starredOrder.push(res.data.id)
+          } else if (!res.data.starred) {
+            this.starredOrder = this.starredOrder.filter(id => id !== res.data.id)
+          }
+          this.habitsLoaded = true
           this.saveToCache()
           return res.data
         }
@@ -224,12 +248,21 @@ export const useHabitStore = defineStore('habit', {
         this.saveToCache()
       }
       
+      this._loadHabitsVersion++
+      
       try {
         const res = await habitApi.update(id, habit)
         if (res.code === 0 && res.data) {
           const idx = this.habits.findIndex(h => h.id === id)
           if (idx > -1) {
             this.habits[idx] = res.data
+            if (res.data.starred) {
+              if (!this.starredOrder.includes(id)) {
+                this.starredOrder.push(id)
+              }
+            } else {
+              this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+            }
           }
           this.saveToCache()
           return res.data
@@ -238,6 +271,14 @@ export const useHabitStore = defineStore('habit', {
         console.error('更新习惯失败', e)
         if (oldHabit && index > -1) {
           this.habits[index] = oldHabit
+          const oldStarred = oldHabit.starred
+          if (oldStarred) {
+            if (!this.starredOrder.includes(id)) {
+              this.starredOrder.push(id)
+            }
+          } else {
+            this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+          }
           this.saveToCache()
         }
       }
@@ -252,6 +293,8 @@ export const useHabitStore = defineStore('habit', {
       this.habits = this.habits.filter(h => h.id !== id)
       this.starredOrder = this.starredOrder.filter(sid => sid !== id)
       this.saveToCache()
+      
+      this._loadHabitsVersion++
       
       try {
         const res = await habitApi.delete(id)
@@ -285,12 +328,21 @@ export const useHabitStore = defineStore('habit', {
         this.saveToCache()
       }
       
+      this._loadHabitsVersion++
+      
       try {
         const res = await habitApi.toggleStar(id)
         if (res.code === 0 && res.data) {
           const idx = this.habits.findIndex(h => h.id === id)
           if (idx > -1) {
             this.habits[idx] = res.data
+            if (res.data.starred) {
+              if (!this.starredOrder.includes(id)) {
+                this.starredOrder.push(id)
+              }
+            } else {
+              this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+            }
           }
           this.saveToCache()
           return res.data
@@ -391,13 +443,21 @@ export const useHabitStore = defineStore('habit', {
     },
 
     async archiveHabit(id) {
+      const index = this.habits.findIndex(h => h.id === id)
+      const oldHabit = index > -1 ? { ...this.habits[index] } : null
+      const oldStarredOrder = [...this.starredOrder]
+      
+      if (index > -1) {
+        this.habits.splice(index, 1)
+        this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+        this.saveToCache()
+      }
+      
+      this._loadHabitsVersion++
+      
       try {
         const res = await habitApi.archive(id)
         if (res.code === 0 && res.data) {
-          const index = this.habits.findIndex(h => h.id === id)
-          if (index > -1) {
-            this.habits.splice(index, 1)
-          }
           const archivedHabit = res.data
           const existsIndex = this.archivedHabits.findIndex(h => h.id === id)
           if (existsIndex > -1) {
@@ -405,24 +465,34 @@ export const useHabitStore = defineStore('habit', {
           } else {
             this.archivedHabits.unshift(archivedHabit)
           }
-          this.starredOrder = this.starredOrder.filter(sid => sid !== id)
           this.saveToCache()
           return archivedHabit
         }
       } catch (e) {
         console.error('归档失败', e)
+        if (oldHabit && index > -1) {
+          this.habits.splice(index, 0, oldHabit)
+          this.starredOrder = oldStarredOrder
+          this.saveToCache()
+        }
       }
       return null
     },
 
     async unarchiveHabit(id) {
+      const archiveIndex = this.archivedHabits.findIndex(h => h.id === id)
+      const oldArchivedHabit = archiveIndex > -1 ? { ...this.archivedHabits[archiveIndex] } : null
+      
+      if (archiveIndex > -1) {
+        this.archivedHabits.splice(archiveIndex, 1)
+        this.saveToCache()
+      }
+      
+      this._loadHabitsVersion++
+      
       try {
         const res = await habitApi.unarchive(id)
         if (res.code === 0 && res.data) {
-          const index = this.archivedHabits.findIndex(h => h.id === id)
-          if (index > -1) {
-            this.archivedHabits.splice(index, 1)
-          }
           const habit = res.data
           const existsIndex = this.habits.findIndex(h => h.id === id)
           if (existsIndex > -1) {
@@ -432,12 +502,18 @@ export const useHabitStore = defineStore('habit', {
           }
           if (habit.starred && !this.starredOrder.includes(id)) {
             this.starredOrder.push(id)
+          } else if (!habit.starred) {
+            this.starredOrder = this.starredOrder.filter(sid => sid !== id)
           }
           this.saveToCache()
           return habit
         }
       } catch (e) {
         console.error('取消归档失败', e)
+        if (oldArchivedHabit && archiveIndex > -1) {
+          this.archivedHabits.splice(archiveIndex, 0, oldArchivedHabit)
+          this.saveToCache()
+        }
       }
       return null
     },
