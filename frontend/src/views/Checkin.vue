@@ -246,23 +246,27 @@ const isChecked = (habitId) => {
   return store.todayCheckins[habitId] || false
 }
 
-const toggleCheckin = (habitId) => {
+const toggleCheckin = async (habitId) => {
   if (isToggling.value) return
   isToggling.value = true
-  store.toggleCheckin(habitId)
-  const checked = isChecked(habitId)
+  
+  const result = await store.toggleCheckin(habitId)
+  const checked = result.completed
   showToast(checked ? '已完成 ✨' : '已取消')
   
-  if (checked) {
-    setTimeout(async () => {
-      const challenge = challengeStore.getChallengeByHabitId(habitId)
-      if (challenge) {
-        await challengeStore.refreshChallenge(challenge.id)
-        if (challengeStore.showMilestoneModal) {
-          showMilestoneModal.value = true
-        }
+  if (checked && result.milestoneInfo) {
+    challengeStore.updateChallengeFromMilestoneInfo(result.milestoneInfo)
+    if (challengeStore.showMilestoneModal) {
+      showMilestoneModal.value = true
+    }
+  } else if (checked) {
+    const challenge = challengeStore.getChallengeByHabitId(habitId)
+    if (challenge) {
+      await challengeStore.refreshChallenge(challenge.id)
+      if (challengeStore.showMilestoneModal) {
+        showMilestoneModal.value = true
       }
-    }, 300)
+    }
   }
   
   setTimeout(() => {

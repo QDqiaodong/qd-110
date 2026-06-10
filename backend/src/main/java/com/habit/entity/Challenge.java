@@ -22,21 +22,24 @@ public class Challenge {
     
     private LocalDate endDate;
     
-    private Integer totalDays;
+    private Integer totalDays = 21;
     
-    private Integer completedDays;
+    private Integer completedDays = 0;
     
-    private Integer currentStreak;
+    private Integer currentStreak = 0;
     
-    private Integer maxStreak;
+    private Integer maxStreak = 0;
     
-    private String status;
+    private String status = "active";
     
-    private Boolean milestone7;
+    @TableField("milestone_7")
+    private Boolean milestone7 = false;
     
-    private Boolean milestone14;
+    @TableField("milestone_14")
+    private Boolean milestone14 = false;
     
-    private Boolean milestone21;
+    @TableField("milestone_21")
+    private Boolean milestone21 = false;
     
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

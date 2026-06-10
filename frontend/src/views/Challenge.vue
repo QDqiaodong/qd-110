@@ -310,21 +310,34 @@ const toggleTodayCheckin = async () => {
   const habitId = challenge.value.habitId
   const today = dayjs().format('YYYY-MM-DD')
   
-  habitStore.toggleCheckin(habitId, today)
-  todayCompleted.value = !todayCompleted.value
+  const result = await habitStore.toggleCheckin(habitId, today)
+  todayCompleted.value = result.completed
   
   showToast(todayCompleted.value ? '打卡成功！' : '已取消打卡')
   
-  setTimeout(async () => {
-    const updated = await challengeStore.refreshChallenge(challengeId.value)
+  if (todayCompleted.value && result.milestoneInfo) {
+    challengeStore.updateChallengeFromMilestoneInfo(result.milestoneInfo)
+    const updated = challengeStore.activeChallenges.find(c => c.id === challengeId.value)
     if (updated) {
-      challenge.value = updated
+      challenge.value = { ...updated }
     }
-    
-    if (todayCompleted.value && challengeStore.showMilestoneModal) {
+    if (challengeStore.showMilestoneModal) {
       showMilestoneModal.value = true
     }
-  }, 300)
+  } else if (todayCompleted.value) {
+    const updated = await challengeStore.refreshChallenge(challengeId.value)
+    if (updated) {
+      challenge.value = { ...updated }
+    }
+    if (challengeStore.showMilestoneModal) {
+      showMilestoneModal.value = true
+    }
+  } else {
+    const updated = await challengeStore.refreshChallenge(challengeId.value)
+    if (updated) {
+      challenge.value = { ...updated }
+    }
+  }
 }
 
 const goBack = () => {

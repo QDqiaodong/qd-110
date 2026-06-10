@@ -231,6 +231,10 @@ export const useChallengeStore = defineStore('challenge', {
           this.activeChallenges = this.activeChallenges.filter(c => c.id !== challengeId)
         }
         
+        if (this.currentChallenge?.id === challengeId) {
+          this.currentChallenge = { ...challenge }
+        }
+        
         this.saveToCache()
       }
       

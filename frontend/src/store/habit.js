@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import dayjs from 'dayjs'
-import { habitApi } from '@/utils/request'
+import { habitApi, checkinApi } from '@/utils/request'
 
 const CACHE_KEY = 'habit_assistant_cache'
 
@@ -222,15 +222,30 @@ export const useHabitStore = defineStore('habit', {
       this.saveToCache()
     },
 
-    toggleCheckin(habitId, date = null) {
+    async toggleCheckin(habitId, date = null) {
       const targetDate = date || dayjs().format('YYYY-MM-DD')
       const dateCheckins = { ...(this.checkins[targetDate] || {}) }
-      dateCheckins[habitId] = !dateCheckins[habitId]
+      const oldValue = !!dateCheckins[habitId]
+      const newValue = !oldValue
+      
+      dateCheckins[habitId] = newValue
       this.checkins = {
         ...this.checkins,
         [targetDate]: dateCheckins
       }
       this.saveToCache()
+      
+      let milestoneInfo = null
+      try {
+        const res = await checkinApi.toggle(habitId, targetDate)
+        if (res && res.code === 0 && res.data) {
+          milestoneInfo = res.data.milestoneInfo
+        }
+      } catch (e) {
+        console.error('打卡同步失败', e)
+      }
+      
+      return { completed: newValue, milestoneInfo }
     },
 
     setCurrentSchedule(schedule) {
