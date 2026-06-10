@@ -107,8 +107,15 @@ const expandedId = ref(null)
 
 onMounted(() => {
   store.loadFromCache()
-  store.loadArchivedHabits()
+  initData()
 })
+
+const initData = async () => {
+  await Promise.all([
+    store.loadHabits(),
+    store.loadArchivedHabits()
+  ])
+}
 
 const getCategoryIcon = (category) => {
   const icons = {

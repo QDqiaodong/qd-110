@@ -185,8 +185,15 @@ const filteredHabits = computed(() => {
 onMounted(() => {
   store.loadFromCache()
   challengeStore.loadFromCache()
-  loadChallenges()
+  initData()
 })
+
+const initData = async () => {
+  await Promise.all([
+    store.loadHabits(),
+    loadChallenges()
+  ])
+}
 
 const loadChallenges = async () => {
   await challengeStore.loadActiveChallenges()
@@ -204,12 +211,12 @@ const closeForm = () => {
   form.value = { name: '', category: '生活', time: '', remind: false, starred: false, color: '#3b82f6' }
 }
 
-const submitForm = () => {
+const submitForm = async () => {
   if (editingHabit.value) {
-    store.updateHabit(editingHabit.value.id, form.value)
+    await store.updateHabit(editingHabit.value.id, form.value)
     showToast('修改成功')
   } else {
-    store.addHabit(form.value)
+    await store.addHabit(form.value)
     showToast('添加成功')
   }
   closeForm()
@@ -222,7 +229,7 @@ const deleteHabit = async () => {
       message: `确定要删除「${editingHabit.value.name}」吗？`,
       confirmButtonColor: '#ef4444'
     })
-    store.deleteHabit(editingHabit.value.id)
+    await store.deleteHabit(editingHabit.value.id)
     showToast('删除成功')
     closeForm()
   } catch (e) {}
@@ -247,8 +254,8 @@ const goToArchive = () => {
   router.push('/archive')
 }
 
-const toggleStar = (id) => {
-  store.toggleStarred(id)
+const toggleStar = async (id) => {
+  await store.toggleStarred(id)
 }
 
 const getCategoryIcon = (category) => {

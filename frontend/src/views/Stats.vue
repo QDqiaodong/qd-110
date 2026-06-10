@@ -122,10 +122,15 @@ const habitStats = computed(() => {
 
 onMounted(() => {
   store.loadFromCache()
+  initData()
+})
+
+const initData = async () => {
+  await store.loadHabits()
   nextTick(() => {
     initChart()
   })
-})
+}
 
 watch(statsType, () => {
   nextTick(() => {

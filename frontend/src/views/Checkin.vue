@@ -235,8 +235,15 @@ const form = ref({
 onMounted(() => {
   store.loadFromCache()
   challengeStore.loadFromCache()
-  loadChallenges()
+  initData()
 })
+
+const initData = async () => {
+  await Promise.all([
+    store.loadHabits(),
+    loadChallenges()
+  ])
+}
 
 const loadChallenges = async () => {
   await challengeStore.loadActiveChallenges()
@@ -274,8 +281,8 @@ const toggleCheckin = async (habitId) => {
   }, 200)
 }
 
-const addHabit = () => {
-  store.addHabit(form.value)
+const addHabit = async () => {
+  await store.addHabit(form.value)
   showAdd.value = false
   form.value = { name: '', category: '生活', time: '', remind: false, starred: false, color: '#3b82f6' }
   showToast('添加成功')
@@ -289,11 +296,11 @@ const getCategoryIcon = (category) => {
   return icons[category] || '✨'
 }
 
-const toggleSortMode = () => {
+const toggleSortMode = async () => {
   isSorting.value = !isSorting.value
   if (!isSorting.value) {
     const newOrder = store.starredHabits.map(h => h.id)
-    store.updateStarredOrder(newOrder)
+    await store.updateStarredOrder(newOrder)
   }
 }
 
