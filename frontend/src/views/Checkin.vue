@@ -52,6 +52,7 @@
                 </div>
               </div>
               <div class="habit-check">
+                <van-icon name="chart-trending-o" class="detail-icon" @click.stop="goToDetail(habit)" />
                 <van-checkbox 
                   :model-value="isChecked(habit.id)" 
                   :style="{ '--van-checkbox-checked-icon-color': habit.color }" 
@@ -117,6 +118,7 @@
               </div>
             </div>
             <div class="habit-check">
+              <van-icon name="chart-trending-o" class="detail-icon" @click.stop="goToDetail(habit)" />
               <van-checkbox 
                 :model-value="isChecked(habit.id)" 
                 :style="{ '--van-checkbox-checked-icon-color': habit.color }" 
@@ -158,6 +160,7 @@
               </div>
             </div>
             <div class="habit-check">
+              <van-icon name="chart-trending-o" class="detail-icon" @click.stop="goToDetail(habit)" />
               <van-checkbox :model-value="isChecked(habit.id)" :style="{ '--van-checkbox-checked-icon-color': habit.color }" />
             </div>
           </div>
@@ -246,6 +249,28 @@
       </div>
     </van-popup>
 
+    <van-popup v-model:show="showHabitMilestoneModal" round position="center" :style="{ width: '80%', maxWidth: '320px' }" class="milestone-popup">
+      <div class="milestone-modal habit-milestone-modal">
+        <div class="milestone-celebration">
+          <div class="celebration-icon habit-milestone-icon">{{ habitMilestoneIcon }}</div>
+          <div class="celebration-title habit-milestone-title">{{ habitMilestoneTitle }}</div>
+          <div class="celebration-subtitle habit-milestone-subtitle">🎊 {{ habitMilestoneText }}</div>
+        </div>
+        <div class="milestone-message">
+          {{ habitMilestoneMessage }}
+        </div>
+        <van-button 
+          block 
+          type="primary" 
+          round
+          :style="{ background: store.currentHabitMilestone?.habitColor || '#3b82f6', borderColor: store.currentHabitMilestone?.habitColor || '#3b82f6' }"
+          @click="closeHabitMilestoneModal"
+        >
+          继续加油
+        </van-button>
+      </div>
+    </van-popup>
+
     <van-button
       v-if="store.habits.length > 0"
       class="floating-add-button"
@@ -264,11 +289,13 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useHabitStore } from '@/store/habit'
 import { useChallengeStore } from '@/store/challenge'
 import dayjs from 'dayjs'
 import { showToast } from 'vant'
 
+const router = useRouter()
 const store = useHabitStore()
 const challengeStore = useChallengeStore()
 const viewMode = ref('time')
@@ -279,6 +306,7 @@ const isSorting = ref(false)
 const dragIndex = ref(-1)
 const togglingHabitIds = ref(new Set())
 const showMilestoneModal = ref(false)
+const showHabitMilestoneModal = ref(false)
 const pickerTime = ref(['00', '00'])
 
 const totalHabits = computed(() => store.habits.length)
@@ -341,7 +369,10 @@ const toggleCheckin = async (habitId) => {
     const checked = result.completed
     showToast(checked ? '已完成 ✨' : '已取消')
     
-    if (checked && result.milestoneInfo) {
+    if (checked && result.habitMilestoneInfo) {
+      store.showHabitMilestone(result.habitMilestoneInfo)
+      showHabitMilestoneModal.value = true
+    } else if (checked && result.milestoneInfo) {
       challengeStore.updateChallengeFromMilestoneInfo(result.milestoneInfo)
       if (challengeStore.showMilestoneModal) {
         showMilestoneModal.value = true
@@ -440,6 +471,35 @@ const closeMilestoneModal = () => {
   showMilestoneModal.value = false
   challengeStore.closeMilestoneModal()
 }
+
+const closeHabitMilestoneModal = () => {
+  showHabitMilestoneModal.value = false
+  store.closeHabitMilestoneModal()
+}
+
+const goToDetail = (habit) => {
+  router.push(`/habit/${habit.id}`)
+}
+
+const habitMilestoneIcon = computed(() => {
+  return store.currentHabitMilestone?.milestoneIcon || '🎉'
+})
+
+const habitMilestoneText = computed(() => {
+  const info = store.currentHabitMilestone
+  if (!info) return ''
+  return `${info.milestoneType}次 · ${info.milestoneLabel}`
+})
+
+const habitMilestoneTitle = computed(() => {
+  const info = store.currentHabitMilestone
+  if (!info) return ''
+  return `「${info.habitName}」`
+})
+
+const habitMilestoneMessage = computed(() => {
+  return store.currentHabitMilestone?.message || ''
+})
 </script>
 
 <style lang="scss" scoped>
@@ -816,5 +876,40 @@ const closeMilestoneModal = () => {
   color: $text-secondary;
   line-height: 1.6;
   margin-bottom: 24px;
+}
+
+.habit-milestone-modal {
+  .habit-milestone-icon {
+    animation: bounce 0.6s ease-in-out;
+  }
+  
+  .habit-milestone-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: $text-primary;
+  }
+  
+  .habit-milestone-subtitle {
+    font-size: 20px;
+    font-weight: 700;
+    color: #10b981;
+  }
+}
+
+.habit-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-icon {
+  font-size: 20px;
+  color: #9ca3af;
+  transition: all 0.2s;
+  
+  &:active {
+    transform: scale(1.2);
+    color: $primary-color;
+  }
 }
 </style>

@@ -4,8 +4,10 @@ import com.habit.dto.CheckinDTO;
 import com.habit.dto.Result;
 import com.habit.entity.Checkin;
 import com.habit.entity.Challenge;
+import com.habit.entity.HabitMilestone;
 import com.habit.service.ChallengeService;
 import com.habit.service.CheckinService;
+import com.habit.service.HabitMilestoneService;
 import com.habit.service.StatsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -25,6 +27,9 @@ public class CheckinController {
     
     @Autowired
     private ChallengeService challengeService;
+    
+    @Autowired
+    private HabitMilestoneService habitMilestoneService;
     
     @GetMapping("/{date}")
     public Result<Map<Long, Boolean>> getCheckins(@PathVariable String date) {
@@ -58,9 +63,18 @@ public class CheckinController {
             milestoneInfo.put("isCompleted", "completed".equals(challenge.getStatus()));
         }
         
+        Map<String, Object> habitMilestoneInfo = null;
+        if (checkin.getCompleted()) {
+            HabitMilestone newMilestone = habitMilestoneService.checkAndCreateMilestone(dto.getHabitId(), date);
+            if (newMilestone != null) {
+                habitMilestoneInfo = habitMilestoneService.getMilestoneInfo(newMilestone);
+            }
+        }
+        
         Map<String, Object> result = new HashMap<>();
         result.put("checkin", checkin);
         result.put("milestoneInfo", milestoneInfo);
+        result.put("habitMilestoneInfo", habitMilestoneInfo);
         
         return Result.success(result);
     }

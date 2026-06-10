@@ -63,6 +63,7 @@
               </div>
           </div>
           <div class="habit-actions">
+            <van-icon name="chart-trending-o" class="detail-icon" @click.stop="goToDetail(habit)" />
             <van-icon
               :name="habit.starred ? 'star' : 'star-o'"
               :class="{ 'star-active': habit.starred }"
@@ -109,6 +110,7 @@
                   </div>
               </div>
               <div class="habit-actions">
+                <van-icon name="chart-trending-o" class="detail-icon" @click.stop="goToDetail(habit)" />
                 <van-icon
                   :name="habit.starred ? 'star' : 'star-o'"
                   :class="{ 'star-active': habit.starred }"
@@ -414,6 +416,10 @@ const goToChallengeFromEdit = () => {
     goToChallenge(editingHabit.value.id)
   }
 }
+
+const goToDetail = (habit) => {
+  router.push(`/habit/${habit.id}`)
+}
 </script>
 
 <style lang="scss" scoped>
@@ -613,6 +619,17 @@ const goToChallengeFromEdit = () => {
   
   &:active {
     transform: scale(1.2);
+  }
+}
+
+.detail-icon {
+  font-size: 20px;
+  color: #9ca3af;
+  transition: all 0.2s;
+  
+  &:active {
+    transform: scale(1.2);
+    color: $primary-color;
   }
 }
 

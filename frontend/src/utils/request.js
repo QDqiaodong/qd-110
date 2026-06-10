@@ -65,4 +65,10 @@ export const challengeApi = {
   giveUp: (id) => request.post(`/challenges/${id}/give-up`)
 }
 
+export const milestoneApi = {
+  getByHabit: (habitId) => request.get(`/habit-milestones/habit/${habitId}`),
+  getAll: () => request.get('/habit-milestones/all'),
+  getDefinitions: () => request.get('/habit-milestones/definitions')
+}
+
 export default request

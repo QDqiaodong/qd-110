@@ -70,6 +70,25 @@ CREATE TABLE IF NOT EXISTS challenge (
     INDEX idx_start_date (start_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='21天挑战表';
 
+CREATE TABLE IF NOT EXISTS habit_milestone (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    habit_id BIGINT NOT NULL COMMENT '习惯ID',
+    habit_name VARCHAR(100) NOT NULL COMMENT '习惯名称',
+    habit_color VARCHAR(20) DEFAULT '#3b82f6' COMMENT '习惯颜色',
+    milestone_type INT NOT NULL COMMENT '里程碑类型: 7/30/100/365',
+    milestone_label VARCHAR(50) NOT NULL COMMENT '里程碑标签',
+    milestone_icon VARCHAR(20) DEFAULT '🎉' COMMENT '里程碑图标',
+    achieve_date DATE NOT NULL COMMENT '达成日期',
+    total_checkins INT DEFAULT 0 COMMENT '累计打卡次数',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted TINYINT(1) DEFAULT 0 COMMENT '逻辑删除',
+    INDEX idx_habit_id (habit_id),
+    INDEX idx_milestone_type (milestone_type),
+    INDEX idx_achieve_date (achieve_date),
+    UNIQUE KEY uk_habit_milestone (habit_id, milestone_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='习惯里程碑表';
+
 INSERT INTO habit (name, category, time, remind, color, starred, sort_order) VALUES
 ('早起', '作息', '07:00', 1, '#3b82f6', 1, 1),
 ('阅读30分钟', '学习', '20:00', 1, '#10b981', 0, 0),

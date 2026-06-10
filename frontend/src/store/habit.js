@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import dayjs from 'dayjs'
-import { habitApi, checkinApi } from '@/utils/request'
+import { habitApi, checkinApi, milestoneApi } from '@/utils/request'
 
 const CACHE_KEY = 'habit_assistant_cache'
 
@@ -15,6 +15,9 @@ export const useHabitStore = defineStore('habit', {
     habitsLoaded: false,
     _loadHabitsVersion: 0,
     _togglingHabits: new Set(),
+    showHabitMilestoneModal: false,
+    currentHabitMilestone: null,
+    habitDetails: {},
     templates: [
       { id: 1, name: '早起作息', items: [
         { time: '06:00', title: '起床洗漱' },
@@ -509,7 +512,7 @@ export const useHabitStore = defineStore('habit', {
       
       if (this._togglingHabits.has(`${habitId}_${targetDate}`)) {
         const currentVal = !!(this.checkins[targetDate]?.[habitId])
-        return { completed: currentVal, milestoneInfo: null }
+        return { completed: currentVal, milestoneInfo: null, habitMilestoneInfo: null }
       }
       this._togglingHabits.add(`${habitId}_${targetDate}`)
       
@@ -525,6 +528,7 @@ export const useHabitStore = defineStore('habit', {
       this.saveToCache()
       
       let milestoneInfo = null
+      let habitMilestoneInfo = null
       let finalCompleted = newValue
       let serverSuccess = false
       try {
@@ -532,6 +536,7 @@ export const useHabitStore = defineStore('habit', {
         if (res && res.code === 0 && res.data) {
           serverSuccess = true
           milestoneInfo = res.data.milestoneInfo
+          habitMilestoneInfo = res.data.habitMilestoneInfo
           if (res.data.checkin) {
             finalCompleted = !!res.data.checkin.completed
             const recheckins = { ...(this.checkins[targetDate] || {}) }
@@ -559,7 +564,7 @@ export const useHabitStore = defineStore('habit', {
         this._togglingHabits.delete(`${habitId}_${targetDate}`)
       }
       
-      return { completed: finalCompleted, milestoneInfo }
+      return { completed: finalCompleted, milestoneInfo, habitMilestoneInfo }
     },
 
     setCurrentSchedule(schedule) {
@@ -770,6 +775,33 @@ export const useHabitStore = defineStore('habit', {
       }
       
       return detail
+    },
+
+    showHabitMilestone(info) {
+      this.currentHabitMilestone = info
+      this.showHabitMilestoneModal = true
+    },
+
+    closeHabitMilestoneModal() {
+      this.showHabitMilestoneModal = false
+      this.currentHabitMilestone = null
+    },
+
+    async loadHabitDetail(habitId) {
+      try {
+        const res = await milestoneApi.getByHabit(habitId)
+        if (res.code === 0 && res.data) {
+          this.habitDetails[habitId] = res.data
+          return res.data
+        }
+      } catch (e) {
+        console.error('加载习惯详情失败', e)
+      }
+      return this.habitDetails[habitId] || null
+    },
+
+    getHabitDetail(habitId) {
+      return this.habitDetails[habitId] || null
     }
   }
 })

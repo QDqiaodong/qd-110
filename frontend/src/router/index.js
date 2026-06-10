@@ -36,6 +36,12 @@ const routes = [
     name: 'Challenge',
     component: () => import('@/views/Challenge.vue'),
     meta: { title: '21天挑战' }
+  },
+  {
+    path: '/habit/:id',
+    name: 'HabitDetail',
+    component: () => import('@/views/HabitDetail.vue'),
+    meta: { title: '习惯详情' }
   }
 ]
 
