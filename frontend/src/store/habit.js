@@ -111,6 +111,7 @@ export const useHabitStore = defineStore('habit', {
 
   actions: {
     loadFromCache() {
+      if (this.habitsLoaded) return
       try {
         const cached = localStorage.getItem(CACHE_KEY)
         if (cached) {
@@ -189,11 +190,15 @@ export const useHabitStore = defineStore('habit', {
 
     async addHabit(habit) {
       const tempId = Date.now()
+      const normalizedHabit = { ...habit }
+      if (Array.isArray(normalizedHabit.time)) {
+        normalizedHabit.time = normalizedHabit.time.join(':')
+      }
       const optimisticHabit = {
         id: tempId,
-        ...habit,
-        color: habit.color || this.getRandomColor(),
-        starred: habit.starred || false
+        ...normalizedHabit,
+        color: normalizedHabit.color || this.getRandomColor(),
+        starred: normalizedHabit.starred || false
       }
       this.habits.push(optimisticHabit)
       if (optimisticHabit.starred) {
@@ -204,7 +209,7 @@ export const useHabitStore = defineStore('habit', {
       this._loadHabitsVersion++
       
       try {
-        const res = await habitApi.create(habit)
+        const res = await habitApi.create(normalizedHabit)
         if (res.code === 0 && res.data) {
           const index = this.habits.findIndex(h => h.id === tempId)
           if (index > -1) {
@@ -232,12 +237,17 @@ export const useHabitStore = defineStore('habit', {
     async updateHabit(id, habit) {
       const index = this.habits.findIndex(h => h.id === id)
       const oldHabit = index > -1 ? { ...this.habits[index] } : null
-      
+
+      const normalizedHabit = { ...habit }
+      if (Array.isArray(normalizedHabit.time)) {
+        normalizedHabit.time = normalizedHabit.time.join(':')
+      }
+
       if (index > -1) {
         const oldStarred = this.habits[index].starred
-        this.habits[index] = { ...this.habits[index], ...habit }
-        if (habit.starred !== undefined && habit.starred !== oldStarred) {
-          if (habit.starred) {
+        this.habits[index] = { ...this.habits[index], ...normalizedHabit }
+        if (normalizedHabit.starred !== undefined && normalizedHabit.starred !== oldStarred) {
+          if (normalizedHabit.starred) {
             if (!this.starredOrder.includes(id)) {
               this.starredOrder.push(id)
             }
@@ -251,7 +261,7 @@ export const useHabitStore = defineStore('habit', {
       this._loadHabitsVersion++
       
       try {
-        const res = await habitApi.update(id, habit)
+        const res = await habitApi.update(id, normalizedHabit)
         if (res.code === 0 && res.data) {
           const idx = this.habits.findIndex(h => h.id === id)
           if (idx > -1) {

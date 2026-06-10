@@ -114,7 +114,7 @@
           <van-cell-group inset>
             <van-field v-model="form.name" label="习惯名称" placeholder="请输入习惯名称" :rules="[{ required: true }]" />
             <van-field v-model="form.category" label="分类" is-link readonly placeholder="选择分类" @click="showCategory = true" />
-            <van-field v-model="form.time" label="提醒时间" placeholder="选择时间" readonly is-link @click="showTime = true" />
+            <van-field v-model="form.time" label="提醒时间" placeholder="选择时间" readonly is-link @click="openTimePicker" />
             <van-cell title="开启提醒" is-link>
               <template #right-icon>
                 <van-switch v-model="form.remind" size="20" />
@@ -157,9 +157,9 @@
 
     <van-popup v-model:show="showTime" round position="bottom">
       <van-time-picker
-        v-model="form.time"
+        v-model="pickerTime"
         title="选择提醒时间"
-        @confirm="showTime = false"
+        @confirm="onTimeConfirm"
         @cancel="showTime = false"
       />
     </van-popup>
@@ -217,6 +217,7 @@ const isSorting = ref(false)
 const dragIndex = ref(-1)
 const isToggling = ref(false)
 const showMilestoneModal = ref(false)
+const pickerTime = ref(['00', '00'])
 
 const todayStr = computed(() => dayjs().format('YYYY年MM月DD日 dddd'))
 
@@ -247,6 +248,20 @@ const initData = async () => {
 
 const loadChallenges = async () => {
   await challengeStore.loadActiveChallenges()
+}
+
+const onTimeConfirm = () => {
+  form.value.time = pickerTime.value.join(':')
+  showTime.value = false
+}
+
+const openTimePicker = () => {
+  if (form.value.time && typeof form.value.time === 'string') {
+    pickerTime.value = form.value.time.split(':')
+  } else {
+    pickerTime.value = ['00', '00']
+  }
+  showTime.value = true
 }
 
 const isChecked = (habitId) => {

@@ -72,7 +72,7 @@
           <van-cell-group inset>
             <van-field v-model="form.name" label="习惯名称" placeholder="请输入习惯名称" :rules="[{ required: true }]" />
             <van-field v-model="form.category" label="分类" is-link readonly placeholder="选择分类" @click="showCategory = true" />
-            <van-field v-model="form.time" label="执行时间" placeholder="选择时间" readonly is-link @click="showTime = true" />
+            <van-field v-model="form.time" label="执行时间" placeholder="选择时间" readonly is-link @click="openTimePicker" />
             <van-cell title="开启提醒" is-link>
               <template #right-icon>
                 <van-switch v-model="form.remind" size="20" />
@@ -139,9 +139,9 @@
 
     <van-popup v-model:show="showTime" round position="bottom">
       <van-time-picker
-        v-model="form.time"
+        v-model="pickerTime"
         title="选择执行时间"
-        @confirm="showTime = false"
+        @confirm="onTimeConfirm"
         @cancel="showTime = false"
       />
     </van-popup>
@@ -163,6 +163,7 @@ const showAdd = ref(false)
 const showCategory = ref(false)
 const showTime = ref(false)
 const editingHabit = ref(null)
+const pickerTime = ref(['00', '00'])
 
 const categories = ['全部', '生活', '学习', '作息', '健康', '工作', '运动', '阅读', '其他']
 const categoryList = ['生活', '学习', '作息', '健康', '工作', '运动', '阅读', '其他']
@@ -202,7 +203,26 @@ const loadChallenges = async () => {
 const editHabit = (habit) => {
   editingHabit.value = habit
   form.value = { ...habit }
+  if (habit.time && typeof habit.time === 'string') {
+    pickerTime.value = habit.time.split(':')
+  } else {
+    pickerTime.value = ['00', '00']
+  }
   showAdd.value = true
+}
+
+const onTimeConfirm = () => {
+  form.value.time = pickerTime.value.join(':')
+  showTime.value = false
+}
+
+const openTimePicker = () => {
+  if (form.value.time && typeof form.value.time === 'string') {
+    pickerTime.value = form.value.time.split(':')
+  } else {
+    pickerTime.value = ['00', '00']
+  }
+  showTime.value = true
 }
 
 const closeForm = () => {
@@ -213,8 +233,13 @@ const closeForm = () => {
 
 const submitForm = async () => {
   if (editingHabit.value) {
-    await store.updateHabit(editingHabit.value.id, form.value)
-    showToast('修改成功')
+    const result = await store.updateHabit(editingHabit.value.id, form.value)
+    if (result) {
+      showToast('修改成功')
+    } else {
+      showToast('修改失败，请重试')
+      return
+    }
   } else {
     await store.addHabit(form.value)
     showToast('添加成功')
