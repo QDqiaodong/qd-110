@@ -14,6 +14,7 @@ export const useHabitStore = defineStore('habit', {
     starredOrder: [],
     habitsLoaded: false,
     _loadHabitsVersion: 0,
+    _togglingHabits: new Set(),
     templates: [
       { id: 1, name: '早起作息', items: [
         { time: '06:00', title: '起床洗漱' },
@@ -147,7 +148,6 @@ export const useHabitStore = defineStore('habit', {
         console.error('缓存保存失败', e)
       }
     },
-
     initDefaultData() {
       this.habits = [
         { id: 1, name: '早起', category: '作息', time: '07:00', remind: true, color: '#3b82f6', starred: true, archived: false },
@@ -188,9 +188,34 @@ export const useHabitStore = defineStore('habit', {
       return this.habits
     },
 
+    getRandomColor() {
+      const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899']
+      return colors[Math.floor(Math.random() * colors.length)]
+    },
+
+    normalizeHabitName(name) {
+      if (!name) return ''
+      return name.trim().replace(/\s+/g, ' ')
+    },
+
+    isDuplicateHabitName(normalizedName, excludeId = null) {
+      return this.habits.some(h => {
+        if (excludeId !== null && h.id === excludeId) return false
+        return this.normalizeHabitName(h.name) === normalizedName
+      })
+    },
+
     async addHabit(habit) {
+      const normalizedName = this.normalizeHabitName(habit.name)
+      if (!normalizedName) {
+        throw new Error('习惯名称不能为空')
+      }
+      if (this.isDuplicateHabitName(normalizedName)) {
+        throw new Error('已存在同名习惯')
+      }
+
       const tempId = Date.now()
-      const normalizedHabit = { ...habit }
+      const normalizedHabit = { ...habit, name: normalizedName }
       if (Array.isArray(normalizedHabit.time)) {
         normalizedHabit.time = normalizedHabit.time.join(':')
       }
@@ -235,10 +260,23 @@ export const useHabitStore = defineStore('habit', {
     },
 
     async updateHabit(id, habit) {
+      const normalizedName = this.normalizeHabitName(habit.name)
+      if (habit.name !== undefined) {
+        if (!normalizedName) {
+          throw new Error('习惯名称不能为空')
+        }
+        if (this.isDuplicateHabitName(normalizedName, id)) {
+          throw new Error('已存在同名习惯')
+        }
+      }
+
       const index = this.habits.findIndex(h => h.id === id)
       const oldHabit = index > -1 ? { ...this.habits[index] } : null
 
       const normalizedHabit = { ...habit }
+      if (habit.name !== undefined) {
+        normalizedHabit.name = normalizedName
+      }
       if (Array.isArray(normalizedHabit.time)) {
         normalizedHabit.time = normalizedHabit.time.join(':')
       }
@@ -399,6 +437,13 @@ export const useHabitStore = defineStore('habit', {
 
     async toggleCheckin(habitId, date = null) {
       const targetDate = date || dayjs().format('YYYY-MM-DD')
+      
+      if (this._togglingHabits.has(`${habitId}_${targetDate}`)) {
+        const currentVal = !!(this.checkins[targetDate]?.[habitId])
+        return { completed: currentVal, milestoneInfo: null }
+      }
+      this._togglingHabits.add(`${habitId}_${targetDate}`)
+      
       const dateCheckins = { ...(this.checkins[targetDate] || {}) }
       const oldValue = !!dateCheckins[habitId]
       const newValue = !oldValue
@@ -411,16 +456,41 @@ export const useHabitStore = defineStore('habit', {
       this.saveToCache()
       
       let milestoneInfo = null
+      let finalCompleted = newValue
+      let serverSuccess = false
       try {
         const res = await checkinApi.toggle(habitId, targetDate)
         if (res && res.code === 0 && res.data) {
+          serverSuccess = true
           milestoneInfo = res.data.milestoneInfo
+          if (res.data.checkin) {
+            finalCompleted = !!res.data.checkin.completed
+            const recheckins = { ...(this.checkins[targetDate] || {}) }
+            recheckins[habitId] = finalCompleted
+            this.checkins = {
+              ...this.checkins,
+              [targetDate]: recheckins
+            }
+            this.saveToCache()
+          }
         }
       } catch (e) {
         console.error('打卡同步失败', e)
+      } finally {
+        if (!serverSuccess) {
+          const rollbackCheckins = { ...(this.checkins[targetDate] || {}) }
+          rollbackCheckins[habitId] = oldValue
+          this.checkins = {
+            ...this.checkins,
+            [targetDate]: rollbackCheckins
+          }
+          this.saveToCache()
+          finalCompleted = oldValue
+        }
+        this._togglingHabits.delete(`${habitId}_${targetDate}`)
       }
       
-      return { completed: newValue, milestoneInfo }
+      return { completed: finalCompleted, milestoneInfo }
     },
 
     setCurrentSchedule(schedule) {

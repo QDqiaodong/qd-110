@@ -232,19 +232,23 @@ const closeForm = () => {
 }
 
 const submitForm = async () => {
-  if (editingHabit.value) {
-    const result = await store.updateHabit(editingHabit.value.id, form.value)
-    if (result) {
-      showToast('修改成功')
+  try {
+    if (editingHabit.value) {
+      const result = await store.updateHabit(editingHabit.value.id, form.value)
+      if (result) {
+        showToast('修改成功')
+      } else {
+        showToast('修改失败，请重试')
+        return
+      }
     } else {
-      showToast('修改失败，请重试')
-      return
+      await store.addHabit(form.value)
+      showToast('添加成功')
     }
-  } else {
-    await store.addHabit(form.value)
-    showToast('添加成功')
+    closeForm()
+  } catch (e) {
+    showToast(e.message || '操作失败')
   }
-  closeForm()
 }
 
 const deleteHabit = async () => {

@@ -58,8 +58,16 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
     }
     
     public Habit createHabit(HabitDTO dto) {
+        String normalizedName = normalizeHabitName(dto.getName());
+        if (normalizedName.isEmpty()) {
+            throw new IllegalArgumentException("习惯名称不能为空");
+        }
+        if (isDuplicateName(normalizedName, null)) {
+            throw new IllegalArgumentException("已存在同名习惯");
+        }
+
         Habit habit = new Habit();
-        habit.setName(dto.getName());
+        habit.setName(normalizedName);
         habit.setCategory(dto.getCategory() != null ? dto.getCategory() : "生活");
         habit.setTime(dto.getTime());
         habit.setRemind(dto.getRemind() != null ? dto.getRemind() : false);
@@ -84,11 +92,21 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
         if (habit == null) {
             return null;
         }
+
+        if (dto.getName() != null) {
+            String normalizedName = normalizeHabitName(dto.getName());
+            if (normalizedName.isEmpty()) {
+                throw new IllegalArgumentException("习惯名称不能为空");
+            }
+            if (isDuplicateName(normalizedName, id)) {
+                throw new IllegalArgumentException("已存在同名习惯");
+            }
+            habit.setName(normalizedName);
+        }
         
         boolean starChanged = false;
         boolean wasStarred = habit.getStarred() != null && habit.getStarred();
         
-        if (dto.getName() != null) habit.setName(dto.getName());
         if (dto.getCategory() != null) habit.setCategory(dto.getCategory());
         if (dto.getTime() != null) habit.setTime(dto.getTime());
         if (dto.getRemind() != null) habit.setRemind(dto.getRemind());
@@ -112,6 +130,27 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
         
         clearCache();
         return habit;
+    }
+
+    private String normalizeHabitName(String name) {
+        if (name == null) return "";
+        return name.trim().replaceAll("\\s+", " ");
+    }
+
+    private boolean isDuplicateName(String normalizedName, Long excludeId) {
+        LambdaQueryWrapper<Habit> wrapper = new LambdaQueryWrapper<Habit>()
+                .eq(Habit::getArchived, false);
+        List<Habit> habits = this.list(wrapper);
+        for (Habit h : habits) {
+            if (excludeId != null && h.getId().equals(excludeId)) {
+                continue;
+            }
+            String existingNormalized = normalizeHabitName(h.getName());
+            if (normalizedName.equals(existingNormalized)) {
+                return true;
+            }
+        }
+        return false;
     }
     
     public boolean deleteHabit(Long id) {

@@ -215,7 +215,7 @@ const showCategory = ref(false)
 const showTime = ref(false)
 const isSorting = ref(false)
 const dragIndex = ref(-1)
-const isToggling = ref(false)
+const togglingHabitIds = ref(new Set())
 const showMilestoneModal = ref(false)
 const pickerTime = ref(['00', '00'])
 
@@ -269,38 +269,42 @@ const isChecked = (habitId) => {
 }
 
 const toggleCheckin = async (habitId) => {
-  if (isToggling.value) return
-  isToggling.value = true
+  if (togglingHabitIds.value.has(habitId)) return
+  togglingHabitIds.value.add(habitId)
   
-  const result = await store.toggleCheckin(habitId)
-  const checked = result.completed
-  showToast(checked ? '已完成 ✨' : '已取消')
-  
-  if (checked && result.milestoneInfo) {
-    challengeStore.updateChallengeFromMilestoneInfo(result.milestoneInfo)
-    if (challengeStore.showMilestoneModal) {
-      showMilestoneModal.value = true
-    }
-  } else if (checked) {
-    const challenge = challengeStore.getChallengeByHabitId(habitId)
-    if (challenge) {
-      await challengeStore.refreshChallenge(challenge.id)
+  try {
+    const result = await store.toggleCheckin(habitId)
+    const checked = result.completed
+    showToast(checked ? '已完成 ✨' : '已取消')
+    
+    if (checked && result.milestoneInfo) {
+      challengeStore.updateChallengeFromMilestoneInfo(result.milestoneInfo)
       if (challengeStore.showMilestoneModal) {
         showMilestoneModal.value = true
       }
+    } else if (checked) {
+      const challenge = challengeStore.getChallengeByHabitId(habitId)
+      if (challenge) {
+        await challengeStore.refreshChallenge(challenge.id)
+        if (challengeStore.showMilestoneModal) {
+          showMilestoneModal.value = true
+        }
+      }
     }
+  } finally {
+    togglingHabitIds.value.delete(habitId)
   }
-  
-  setTimeout(() => {
-    isToggling.value = false
-  }, 200)
 }
 
 const addHabit = async () => {
-  await store.addHabit(form.value)
-  showAdd.value = false
-  form.value = { name: '', category: '生活', time: '', remind: false, starred: false, color: '#3b82f6' }
-  showToast('添加成功')
+  try {
+    await store.addHabit(form.value)
+    showAdd.value = false
+    form.value = { name: '', category: '生活', time: '', remind: false, starred: false, color: '#3b82f6' }
+    showToast('添加成功')
+  } catch (e) {
+    showToast(e.message || '添加失败')
+  }
 }
 
 const getCategoryIcon = (category) => {
