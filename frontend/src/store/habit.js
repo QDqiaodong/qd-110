@@ -409,9 +409,19 @@ export const useHabitStore = defineStore('habit', {
       const index = this.habits.findIndex(h => h.id === id)
       const oldHabit = index > -1 ? { ...this.habits[index] } : null
       const oldStarredOrder = [...this.starredOrder]
+      const oldCheckins = JSON.parse(JSON.stringify(this.checkins))
       
       this.habits = this.habits.filter(h => h.id !== id)
       this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+      
+      const newCheckins = {}
+      for (const date in this.checkins) {
+        const dateCheckins = { ...this.checkins[date] }
+        delete dateCheckins[id]
+        newCheckins[date] = dateCheckins
+      }
+      this.checkins = newCheckins
+      
       this.saveToCache()
       
       this._loadHabitsVersion++
@@ -426,6 +436,7 @@ export const useHabitStore = defineStore('habit', {
         if (oldHabit) {
           this.habits.splice(index, 0, oldHabit)
           this.starredOrder = oldStarredOrder
+          this.checkins = oldCheckins
           this.saveToCache()
         }
       }
@@ -604,6 +615,15 @@ export const useHabitStore = defineStore('habit', {
       if (index > -1) {
         this.habits.splice(index, 1)
         this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+        
+        const newCheckins = {}
+        for (const date in this.checkins) {
+          const dateCheckins = { ...this.checkins[date] }
+          delete dateCheckins[id]
+          newCheckins[date] = dateCheckins
+        }
+        this.checkins = newCheckins
+        
         this.saveToCache()
       }
       

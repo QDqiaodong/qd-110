@@ -48,7 +48,7 @@
             </div>
             <div class="habit-info">
               <div class="habit-name">{{ habit.name }}</div>
-              <div class="habit-rate">本周完成 {{ habit.completed }}/{{ weekStats.length }} 天</div>
+              <div class="habit-rate">{{ statsType === 'week' ? '本周' : '本月' }}完成 {{ habit.completed }}/{{ statsType === 'week' ? weekStats.length : monthDayCount }} 天</div>
             </div>
           </div>
           <div class="habit-progress">
@@ -60,7 +60,7 @@
 
     <div class="chart-section">
       <div class="section-header">
-        <div class="section-title">本周日历</div>
+        <div class="section-title">{{ statsType === 'week' ? '本周日历' : '本月日历' }}</div>
       </div>
       <div class="calendar-grid">
         <div
@@ -101,10 +101,16 @@ const avgRate = computed(() => {
 
 const weekStats = computed(() => store.weekStats)
 
+const monthDayCount = computed(() => {
+  const daysInMonth = new Date().getDate()
+  return Math.min(daysInMonth, 30)
+})
+
 const habitStats = computed(() => {
+  const days = statsType.value === 'week' ? 7 : monthDayCount.value
   return store.habits.map(habit => {
     let completed = 0
-    for (let i = 6; i >= 0; i--) {
+    for (let i = days - 1; i >= 0; i--) {
       const date = new Date()
       date.setDate(date.getDate() - i)
       const dateStr = date.toISOString().split('T')[0]
@@ -115,7 +121,7 @@ const habitStats = computed(() => {
     return {
       ...habit,
       completed,
-      rate: Math.round((completed / 7) * 100)
+      rate: Math.round((completed / days) * 100)
     }
   }).sort((a, b) => b.rate - a.rate)
 })
@@ -188,7 +194,7 @@ const updateChart = () => {
         borderRadius: [4, 4, 0, 0]
       }
     }]
-  })
+  }, true)
 }
 
 const getWeekData = () => {

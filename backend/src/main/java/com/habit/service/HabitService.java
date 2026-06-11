@@ -8,6 +8,7 @@ import com.habit.mapper.HabitMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
@@ -17,6 +18,9 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
     
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
+    
+    @Autowired
+    private CheckinService checkinService;
     
     public List<Habit> getHabitList() {
         return this.list(new LambdaQueryWrapper<Habit>()
@@ -153,7 +157,9 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
         return false;
     }
     
+    @Transactional
     public boolean deleteHabit(Long id) {
+        checkinService.softDeleteByHabitId(id);
         boolean result = this.removeById(id);
         if (result) {
             clearCache();

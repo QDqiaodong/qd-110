@@ -71,6 +71,19 @@ public class CheckinService extends ServiceImpl<CheckinMapper, Checkin> {
         return checkinMapper.selectByDateRange(startDate, endDate);
     }
     
+    @Transactional
+    public int softDeleteByHabitId(Long habitId) {
+        List<Checkin> checkins = this.list(new LambdaQueryWrapper<Checkin>()
+                .eq(Checkin::getHabitId, habitId));
+        
+        for (Checkin checkin : checkins) {
+            clearDateCache(checkin.getCheckinDate());
+            this.removeById(checkin.getId());
+        }
+        
+        return checkins.size();
+    }
+    
     private void clearDateCache(LocalDate date) {
         redisTemplate.delete(CHECKIN_CACHE_PREFIX + date);
     }
