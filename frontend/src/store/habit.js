@@ -9,6 +9,7 @@ export const useHabitStore = defineStore('habit', {
     habits: [],
     archivedHabits: [],
     checkins: {},
+    missReasons: {},
     schedules: [],
     currentSchedule: null,
     starredOrder: [],
@@ -19,6 +20,7 @@ export const useHabitStore = defineStore('habit', {
     showHabitMilestoneModal: false,
     currentHabitMilestone: null,
     habitDetails: {},
+    missReasonPresets: ['加班', '出门', '忘记', '状态差'],
     templates: [
       { id: 1, name: '早起作息', items: [
         { time: '06:00', title: '起床洗漱' },
@@ -304,6 +306,37 @@ export const useHabitStore = defineStore('habit', {
       
       return { periods: analysis, overall }
     },
+    getMissedHabitsWithReasons: (state) => (date = null) => {
+      const targetDate = date || dayjs().format('YYYY-MM-DD')
+      const checkins = state.checkins[targetDate] || {}
+      const reasons = state.missReasons[targetDate] || {}
+      const missed = []
+      state.habits.forEach(habit => {
+        if (!checkins[habit.id]) {
+          missed.push({
+            ...habit,
+            reason: reasons[habit.id] || null
+          })
+        }
+      })
+      return missed
+    },
+    getMissReasonStats: (state) => (days = 7) => {
+      const stats = {}
+      const today = dayjs()
+      for (let i = days - 1; i >= 0; i--) {
+        const dateStr = today.subtract(i, 'day').format('YYYY-MM-DD')
+        const reasons = state.missReasons[dateStr] || {}
+        Object.values(reasons).forEach(reason => {
+          if (reason) {
+            stats[reason] = (stats[reason] || 0) + 1
+          }
+        })
+      }
+      return Object.entries(stats)
+        .map(([reason, count]) => ({ reason, count }))
+        .sort((a, b) => b.count - a.count)
+    },
     getTimeSlotComparison: (state, getters) => (date = null) => {
       const targetDate = date || dayjs().format('YYYY-MM-DD')
       const checkins = state.checkins[targetDate] || {}
@@ -351,6 +384,7 @@ export const useHabitStore = defineStore('habit', {
           this.habits = data.habits || []
           this.archivedHabits = data.archivedHabits || []
           this.checkins = data.checkins || {}
+          this.missReasons = data.missReasons || {}
           this.schedules = data.schedules || []
           this.currentSchedule = data.currentSchedule || this.templates[0]
           this.starredOrder = data.starredOrder || []
@@ -371,6 +405,7 @@ export const useHabitStore = defineStore('habit', {
           habits: this.habits,
           archivedHabits: this.archivedHabits,
           checkins: this.checkins,
+          missReasons: this.missReasons,
           schedules: this.schedules,
           currentSchedule: this.currentSchedule,
           starredOrder: this.starredOrder
@@ -378,6 +413,22 @@ export const useHabitStore = defineStore('habit', {
       } catch (e) {
         console.error('缓存保存失败', e)
       }
+    },
+    saveMissReason(habitId, reason, date = null) {
+      const targetDate = date || dayjs().format('YYYY-MM-DD')
+      if (!this.missReasons[targetDate]) {
+        this.missReasons[targetDate] = {}
+      }
+      if (reason) {
+        this.missReasons[targetDate][habitId] = reason
+      } else {
+        delete this.missReasons[targetDate][habitId]
+      }
+      this.saveToCache()
+    },
+    getMissReason(habitId, date = null) {
+      const targetDate = date || dayjs().format('YYYY-MM-DD')
+      return this.missReasons[targetDate]?.[habitId] || null
     },
     initDefaultData() {
       this.habits = [

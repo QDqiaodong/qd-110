@@ -226,6 +226,60 @@
       </div>
     </div>
 
+    <div v-if="missedHabitsWithReasons.length > 0" class="missed-reasons-section">
+      <div class="section-title">❌ 未完成习惯</div>
+      <div class="missed-list">
+        <div
+          v-for="habit in missedHabitsWithReasons"
+          :key="habit.id"
+          class="missed-item"
+        >
+          <div class="missed-left">
+            <div class="habit-icon" :style="{ background: habit.color + '20', color: habit.color }">
+              {{ getCategoryIcon(habit.category) }}
+            </div>
+            <div class="habit-info">
+              <div class="habit-name">{{ habit.name }}</div>
+              <div class="habit-time">{{ habit.time || '未设时间' }}</div>
+            </div>
+          </div>
+          <div class="missed-reason">
+            <van-tag v-if="habit.reason" type="warning" round size="medium">
+              {{ habit.reason }}
+            </van-tag>
+            <van-tag v-else type="default" round size="medium" plain>
+              未记录原因
+            </van-tag>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="missReasonStats.length > 0" class="reason-stats-section">
+      <div class="section-title">📊 中断原因统计（近7天）</div>
+      <div class="stats-bars">
+        <div
+          v-for="stat in missReasonStats"
+          :key="stat.reason"
+          class="stat-bar-item"
+        >
+          <div class="stat-label-row">
+            <span class="stat-reason">{{ stat.reason }}</span>
+            <span class="stat-count">{{ stat.count }} 次</span>
+          </div>
+          <div class="stat-bar-bg">
+            <div
+              class="stat-bar-fill"
+              :style="{ width: getBarWidth(stat.count) + '%' }"
+            />
+          </div>
+        </div>
+      </div>
+      <div v-if="topReason" class="top-reason-tip">
+        💡 最常见的中断原因是「{{ topReason }}」，建议针对性调整
+      </div>
+    </div>
+
     <div class="deviation-types-section">
       <div class="section-title">📌 偏差类型说明</div>
       <div class="type-cards">
@@ -294,6 +348,26 @@ const deviationData = computed(() => {
 const timeSlotComparison = computed(() => {
   return store.getTimeSlotComparison(selectedDate.value)
 })
+
+const missedHabitsWithReasons = computed(() => {
+  return store.getMissedHabitsWithReasons(selectedDate.value)
+})
+
+const missReasonStats = computed(() => {
+  return store.getMissReasonStats(7)
+})
+
+const topReason = computed(() => {
+  if (missReasonStats.value.length > 0) {
+    return missReasonStats.value[0].reason
+  }
+  return null
+})
+
+const getBarWidth = (count) => {
+  const maxCount = missReasonStats.value.length > 0 ? missReasonStats.value[0].count : 1
+  return Math.round((count / maxCount) * 100)
+}
 
 const habitCompleted = (habitId) => {
   const checkins = store.checkins[selectedDate.value] || {}
@@ -944,5 +1018,126 @@ onMounted(() => {
 
 .action-section {
   margin-bottom: 20px;
+}
+
+.missed-reasons-section {
+  @include card;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.missed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.missed-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: #fef2f2;
+  border-radius: 12px;
+  border-left: 3px solid $danger-color;
+}
+
+.missed-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.missed-item .habit-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  @include flex-center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.missed-item .habit-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.missed-item .habit-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: $text-primary;
+  margin-bottom: 2px;
+}
+
+.missed-item .habit-time {
+  font-size: 11px;
+  color: $text-secondary;
+}
+
+.missed-reason {
+  flex-shrink: 0;
+}
+
+.reason-stats-section {
+  @include card;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.stats-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stat-bar-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stat-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stat-reason {
+  font-size: 14px;
+  font-weight: 500;
+  color: $text-primary;
+}
+
+.stat-count {
+  font-size: 12px;
+  color: $text-secondary;
+  font-weight: 600;
+}
+
+.stat-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.stat-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.top-reason-tip {
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fff7ed 100%);
+  border-radius: 10px;
+  font-size: 13px;
+  color: #92400e;
+  line-height: 1.5;
 }
 </style>

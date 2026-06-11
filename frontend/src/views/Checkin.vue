@@ -314,6 +314,74 @@
       </div>
     </van-popup>
 
+    <van-popup v-model:show="showMissReasonModal" round position="bottom" :style="{ height: '70%' }">
+      <div class="miss-reason-modal">
+        <div class="modal-header">
+          <div>
+            <div class="modal-title">📝 记录未完成原因</div>
+            <div class="modal-subtitle">{{ missedHabits.length }} 个习惯待记录，帮助后续复盘</div>
+          </div>
+          <van-icon name="cross" @click="showMissReasonModal = false" />
+        </div>
+        <div class="modal-content">
+          <div v-for="habit in missedHabits" :key="habit.id" class="miss-habit-item">
+            <div class="miss-habit-left">
+              <div class="habit-icon" :style="{ background: habit.color + '20', color: habit.color }">
+                {{ getCategoryIcon(habit.category) }}
+              </div>
+              <div class="habit-info">
+                <div class="habit-name">{{ habit.name }}</div>
+                <div class="habit-meta">
+                  <span v-if="habit.time" class="habit-time">⏰ {{ habit.time }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="miss-reason-section">
+              <div class="preset-reasons">
+                <van-tag
+                  v-for="preset in store.missReasonPresets"
+                  :key="preset"
+                  :type="currentReasons[habit.id] === preset ? 'primary' : 'default'"
+                  size="medium"
+                  round
+                  class="preset-tag"
+                  @click="selectPresetReason(habit.id, preset)"
+                >
+                  {{ preset }}
+                </van-tag>
+              </div>
+              <van-field
+                v-model="customReasons[habit.id]"
+                placeholder="或输入自定义原因..."
+                class="custom-reason-input"
+                @input="onCustomReasonChange(habit.id)"
+              />
+            </div>
+          </div>
+          <div v-if="missedHabits.length === 0" class="empty-miss">
+            <div class="empty-icon">✨</div>
+            <div class="empty-text">太棒了！今日习惯全部完成</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <van-button block round type="primary" @click="saveMissReasons">
+            保存记录
+          </van-button>
+        </div>
+      </div>
+    </van-popup>
+
+    <van-button
+      v-if="store.habits.length > 0 && missedHabits.length > 0"
+      class="miss-reason-button"
+      type="warning"
+      round
+      icon="edit"
+      @click="openMissReasonModal"
+    >
+      记录原因
+    </van-button>
+
     <van-button
       v-if="store.habits.length > 0"
       class="floating-add-button"
@@ -350,9 +418,16 @@ const dragIndex = ref(-1)
 const togglingHabitIds = ref(new Set())
 const showMilestoneModal = ref(false)
 const showHabitMilestoneModal = ref(false)
+const showMissReasonModal = ref(false)
 const pickerTime = ref(['00', '00'])
+const currentReasons = ref({})
+const customReasons = ref({})
 
 const totalHabits = computed(() => store.habits.length)
+
+const missedHabits = computed(() => {
+  return store.getMissedHabitsWithReasons()
+})
 
 const morningCompletedCount = computed(() => store.morningCards.filter(c => c.completed).length)
 
@@ -547,6 +622,49 @@ const habitMilestoneTitle = computed(() => {
 const habitMilestoneMessage = computed(() => {
   return store.currentHabitMilestone?.message || ''
 })
+
+const openMissReasonModal = () => {
+  currentReasons.value = {}
+  customReasons.value = {}
+  missedHabits.value.forEach(habit => {
+    if (habit.reason) {
+      if (store.missReasonPresets.includes(habit.reason)) {
+        currentReasons.value[habit.id] = habit.reason
+      } else {
+        customReasons.value[habit.id] = habit.reason
+      }
+    }
+  })
+  showMissReasonModal.value = true
+}
+
+const selectPresetReason = (habitId, preset) => {
+  if (currentReasons.value[habitId] === preset) {
+    delete currentReasons.value[habitId]
+  } else {
+    currentReasons.value[habitId] = preset
+    delete customReasons.value[habitId]
+  }
+}
+
+const onCustomReasonChange = (habitId) => {
+  const customVal = customReasons.value[habitId]?.trim()
+  if (customVal) {
+    delete currentReasons.value[habitId]
+  }
+}
+
+const saveMissReasons = async () => {
+  missedHabits.value.forEach(habit => {
+    let reason = currentReasons.value[habit.id] || null
+    if (!reason && customReasons.value[habit.id]?.trim()) {
+      reason = customReasons.value[habit.id].trim()
+    }
+    store.saveMissReason(habit.id, reason)
+  })
+  showMissReasonModal.value = false
+  showToast('已保存记录 ✨')
+}
 </script>
 
 <style lang="scss" scoped>
@@ -1121,5 +1239,106 @@ const habitMilestoneMessage = computed(() => {
     transform: scale(1.2);
     color: $primary-color;
   }
+}
+
+.miss-reason-button {
+  position: fixed;
+  right: 20px;
+  bottom: 152px;
+  z-index: 10;
+  box-shadow: 0 10px 24px rgba(245, 158, 11, 0.24);
+}
+
+.miss-reason-modal {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.modal-header {
+  @include flex-between;
+  padding: 20px;
+  border-bottom: 1px solid $border-color;
+  
+  .van-icon {
+    font-size: 20px;
+    color: $text-secondary;
+    cursor: pointer;
+  }
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: $text-primary;
+}
+
+.modal-subtitle {
+  font-size: 12px;
+  color: $text-secondary;
+  margin-top: 4px;
+}
+
+.modal-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.miss-habit-item {
+  @include card;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.miss-habit-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.miss-reason-section {
+  padding-top: 12px;
+  border-top: 1px solid $border-color;
+}
+
+.preset-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.preset-tag {
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 12px;
+}
+
+.custom-reason-input {
+  :deep(.van-field__control) {
+    font-size: 13px;
+  }
+}
+
+.empty-miss {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.empty-text {
+  font-size: 14px;
+  color: $text-secondary;
+}
+
+.modal-footer {
+  padding: 16px 20px;
+  border-top: 1px solid $border-color;
 }
 </style>
