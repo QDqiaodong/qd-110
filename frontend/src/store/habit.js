@@ -206,6 +206,138 @@ export const useHabitStore = defineStore('habit', {
         })
       }
       return stats
+    },
+    getScheduleItemsByTime: (state) => {
+      if (!state.currentSchedule || !state.currentSchedule.items) return []
+      return [...state.currentSchedule.items].sort((a, b) => a.time.localeCompare(b.time))
+    },
+    getHabitsByTimePeriod: (state, getters) => (period) => {
+      const habits = state.habits.filter(h => getters.getTimePeriod(h.time) === period)
+      return habits.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'))
+    },
+    getDeviationAnalysis: (state, getters) => (date = null) => {
+      const targetDate = date || dayjs().format('YYYY-MM-DD')
+      const checkins = state.checkins[targetDate] || {}
+      const scheduleItems = getters.getScheduleItemsByTime
+      const habits = state.habits
+      
+      const periods = [
+        { key: 'morning', title: '🌅 清晨', start: 4, end: 10 },
+        { key: 'daytime', title: '☀️ 白天', start: 10, end: 18 },
+        { key: 'night', title: '🌙 夜间', start: 18, end: 28 }
+      ]
+      
+      const analysis = periods.map(period => {
+        const periodScheduleItems = scheduleItems.filter(item => {
+          const hour = parseInt(item.time.split(':')[0], 10)
+          const adjustedHour = hour < 4 ? hour + 24 : hour
+          return adjustedHour >= period.start && adjustedHour < period.end
+        })
+        
+        const periodHabits = habits.filter(h => {
+          const hPeriod = getters.getTimePeriod(h.time)
+          return hPeriod === period.key
+        })
+        
+        const periodCompletedHabits = periodHabits.filter(h => checkins[h.id] === true)
+        const periodMissedHabits = periodHabits.filter(h => checkins[h.id] !== true)
+        
+        let deviationType = 'normal'
+        let deviationDesc = '作息正常'
+        let severity = 0
+        
+        if (periodScheduleItems.length > 5) {
+          deviationType = 'overload'
+          deviationDesc = '任务过度堆叠'
+          severity = 2
+        } else if (periodMissedHabits.length >= 2 && periodHabits.length > 0) {
+          deviationType = 'procrastination'
+          deviationDesc = '存在拖延情况'
+          severity = 1
+        } else if (periodHabits.length === 0 && periodScheduleItems.length > 0) {
+          deviationType = 'missing'
+          deviationDesc = '有计划但无对应习惯'
+          severity = 1
+        }
+        
+        return {
+          ...period,
+          scheduleItems: periodScheduleItems,
+          habits: periodHabits,
+          completedHabits: periodCompletedHabits,
+          missedHabits: periodMissedHabits,
+          deviationType,
+          deviationDesc,
+          severity,
+          completionRate: periodHabits.length > 0 
+            ? Math.round((periodCompletedHabits.length / periodHabits.length) * 100) 
+            : (periodScheduleItems.length > 0 ? 0 : 100)
+        }
+      })
+      
+      const overall = {
+        totalScheduleItems: scheduleItems.length,
+        totalHabits: habits.length,
+        completedHabits: habits.filter(h => checkins[h.id] === true).length,
+        overallRate: habits.length > 0 
+          ? Math.round((habits.filter(h => checkins[h.id] === true).length / habits.length) * 100) 
+          : 0,
+        worstPeriod: analysis.reduce((worst, curr) => 
+          curr.severity > worst.severity ? curr : worst, 
+          analysis[0]
+        ),
+        suggestions: []
+      }
+      
+      if (overall.worstPeriod.deviationType === 'overload') {
+        overall.suggestions.push(`⚠️ ${overall.worstPeriod.title}时段安排了${overall.worstPeriod.scheduleItems.length}项任务，建议精简至3-4项`)
+      }
+      if (overall.worstPeriod.deviationType === 'procrastination') {
+        overall.suggestions.push(`⚠️ ${overall.worstPeriod.title}时段完成率仅${overall.worstPeriod.completionRate}%，建议设置更明确的提醒`)
+      }
+      if (overall.worstPeriod.deviationType === 'missing') {
+        overall.suggestions.push(`💡 ${overall.worstPeriod.title}时段有计划但未设置对应习惯，建议添加相关习惯`)
+      }
+      if (overall.overallRate < 50) {
+        overall.suggestions.push('💪 整体完成率偏低，建议从减少习惯数量开始，聚焦最重要的2-3个习惯')
+      }
+      
+      return { periods: analysis, overall }
+    },
+    getTimeSlotComparison: (state, getters) => (date = null) => {
+      const targetDate = date || dayjs().format('YYYY-MM-DD')
+      const checkins = state.checkins[targetDate] || {}
+      const scheduleItems = getters.getScheduleItemsByTime
+      const habits = state.habits
+      
+      const timeSlots = []
+      
+      scheduleItems.forEach(item => {
+        const hour = parseInt(item.time.split(':')[0], 10)
+        const matchedHabits = habits.filter(h => {
+          if (!h.time) return false
+          const hHour = parseInt(h.time.split(':')[0], 10)
+          return Math.abs(hour - hHour) <= 1
+        })
+        
+        timeSlots.push({
+          time: item.time,
+          planned: item.title,
+          actualHabits: matchedHabits.map(h => ({
+            ...h,
+            completed: checkins[h.id] === true
+          })),
+          deviation: matchedHabits.length === 0 
+            ? 'missing' 
+            : matchedHabits.every(h => checkins[h.id] !== true)
+              ? 'missed'
+              : matchedHabits.some(h => checkins[h.id] !== true)
+                ? 'partial'
+                : 'completed'
+        })
+      })
+      
+      return timeSlots
     }
   },
 

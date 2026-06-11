@@ -10,6 +10,15 @@
       </van-button>
     </div>
 
+    <div class="review-entry" @click="goToReview">
+      <div class="review-icon">📊</div>
+      <div class="review-info">
+        <div class="review-title">作息偏差复盘</div>
+        <div class="review-desc">查看计划与实际的偏差分析</div>
+      </div>
+      <van-icon name="arrow" />
+    </div>
+
     <div class="template-tabs">
       <van-tabs v-model:active="activeTab" sticky line-width="24">
         <van-tab title="系统模板" name="system" />
@@ -140,9 +149,11 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useHabitStore } from '@/store/habit'
 import { showToast, showConfirmDialog } from 'vant'
 
+const router = useRouter()
 const store = useHabitStore()
 const activeTab = ref('system')
 const showAdd = ref(false)
@@ -220,9 +231,54 @@ const deleteTemplate = async (id) => {
     showToast('删除成功')
   } catch (e) {}
 }
+
+const goToReview = () => {
+  router.push('/review')
+}
 </script>
 
 <style lang="scss" scoped>
+.review-entry {
+  @include card;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%);
+  border: 1px solid #fde68a;
+  
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.review-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  @include flex-center;
+  font-size: 20px;
+  background: rgba(245, 158, 11, 0.15);
+  flex-shrink: 0;
+}
+
+.review-info {
+  flex: 1;
+}
+
+.review-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #92400e;
+  margin-bottom: 2px;
+}
+
+.review-desc {
+  font-size: 12px;
+  color: #b45309;
+}
+
 .template-tabs {
   margin: 0 -16px 16px;
 }

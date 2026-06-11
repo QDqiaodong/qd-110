@@ -7,6 +7,15 @@
       </div>
     </div>
 
+    <div class="review-entry" @click="goToReview">
+      <div class="review-icon">🔍</div>
+      <div class="review-info">
+        <div class="review-title">作息偏差复盘</div>
+        <div class="review-desc">对比计划与实际，发现作息问题</div>
+      </div>
+      <van-icon name="arrow" />
+    </div>
+
     <div class="stats-overview">
       <div class="stat-card">
         <div class="stat-value">{{ totalHabits }}</div>
@@ -79,9 +88,11 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { useHabitStore } from '@/store/habit'
 import * as echarts from 'echarts'
 
+const router = useRouter()
 const store = useHabitStore()
 const statsType = ref('week')
 const chartRef = ref(null)
@@ -234,9 +245,54 @@ const getCategoryIcon = (category) => {
   }
   return icons[category] || '✨'
 }
+
+const goToReview = () => {
+  router.push('/review')
+}
 </script>
 
 <style lang="scss" scoped>
+.review-entry {
+  @include card;
+  padding: 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(135deg, #ede9fe 0%, #f0f9ff 100%);
+  border: 1px solid #ddd6fe;
+  
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.review-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  @include flex-center;
+  font-size: 22px;
+  background: rgba(139, 92, 246, 0.15);
+  flex-shrink: 0;
+}
+
+.review-info {
+  flex: 1;
+}
+
+.review-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #5b21b6;
+  margin-bottom: 2px;
+}
+
+.review-desc {
+  font-size: 12px;
+  color: #7c3aed;
+}
+
 .stats-overview {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

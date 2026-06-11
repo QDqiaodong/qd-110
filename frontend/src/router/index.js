@@ -42,6 +42,12 @@ const routes = [
     name: 'HabitDetail',
     component: () => import('@/views/HabitDetail.vue'),
     meta: { title: '习惯详情' }
+  },
+  {
+    path: '/review',
+    name: 'Review',
+    component: () => import('@/views/Review.vue'),
+    meta: { title: '作息偏差复盘' }
   }
 ]
 
