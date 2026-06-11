@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.habit.mapper.MonthlyStatMapper">
+    
+    <select id="selectByYearMonth" resultType="com.habit.entity.MonthlyStat">
+        SELECT * FROM monthly_stat
+        WHERE stat_year = #{year} AND stat_month = #{month}
+        AND deleted = 0
+        LIMIT 1
+    </select>
+    
+    <select id="selectByDateRange" resultType="com.habit.entity.MonthlyStat">
+        SELECT * FROM monthly_stat
+        WHERE (stat_year > #{startDate.year} 
+               OR (stat_year = #{startDate.year} AND stat_month >= #{startDate.monthValue}))
+          AND (stat_year < #{endDate.year} 
+               OR (stat_year = #{endDate.year} AND stat_month <= #{endDate.monthValue}))
+        AND deleted = 0
+        ORDER BY stat_year ASC, stat_month ASC
+    </select>
+    
+</mapper>

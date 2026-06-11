@@ -89,6 +89,23 @@ CREATE TABLE IF NOT EXISTS habit_milestone (
     UNIQUE KEY uk_habit_milestone (habit_id, milestone_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='习惯里程碑表';
 
+CREATE TABLE IF NOT EXISTS monthly_stat (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    stat_year INT NOT NULL COMMENT '统计年份',
+    stat_month INT NOT NULL COMMENT '统计月份',
+    total_habits INT DEFAULT 0 COMMENT '习惯总数',
+    total_checkin_days INT DEFAULT 0 COMMENT '总打卡天数',
+    avg_completed_per_day INT DEFAULT 0 COMMENT '日均完成数',
+    completion_rate INT DEFAULT 0 COMMENT '完成率(%)',
+    trend_data TEXT COMMENT '趋势数据JSON',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted TINYINT(1) DEFAULT 0 COMMENT '逻辑删除',
+    UNIQUE KEY uk_year_month (stat_year, stat_month),
+    INDEX idx_stat_year (stat_year),
+    INDEX idx_stat_month (stat_month)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='月度统计表';
+
 INSERT INTO habit (name, category, time, remind, color, starred, sort_order) VALUES
 ('早起', '作息', '07:00', 1, '#3b82f6', 1, 1),
 ('阅读30分钟', '学习', '20:00', 1, '#10b981', 0, 0),

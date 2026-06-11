@@ -3,8 +3,10 @@ package com.habit.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.habit.entity.Checkin;
+import com.habit.event.CheckinChangedEvent;
 import com.habit.mapper.CheckinMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +27,9 @@ public class CheckinService extends ServiceImpl<CheckinMapper, Checkin> {
     
     @Autowired
     private CheckinMapper checkinMapper;
+    
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
     
     @SuppressWarnings("unchecked")
     public Map<Long, Boolean> getCheckinsByDate(LocalDate date) {
@@ -64,6 +69,8 @@ public class CheckinService extends ServiceImpl<CheckinMapper, Checkin> {
         }
         
         clearDateCache(date);
+        eventPublisher.publishEvent(new CheckinChangedEvent(
+            this, date, CheckinChangedEvent.ChangeType.CHECKIN_TOGGLE));
         return existing;
     }
     

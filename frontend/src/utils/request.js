@@ -52,7 +52,11 @@ export const scheduleApi = {
 
 export const statsApi = {
   getWeekStats: () => request.get('/stats/week'),
-  getMonthStats: () => request.get('/stats/month')
+  getMonthStats: () => request.get('/stats/month'),
+  getMonthlyTrend: () => request.get('/stats/monthly-trend'),
+  getMonthlyStat: (year, month) => request.get(`/stats/monthly/${year}/${month}`),
+  recalculateMonthly: (year, month) => request.post(`/stats/monthly/recalculate/${year}/${month}`),
+  recalculateForDate: (date) => request.post(`/stats/monthly/recalculate/date/${date}`)
 }
 
 export const challengeApi = {

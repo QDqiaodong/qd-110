@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.habit.dto.HabitDTO;
 import com.habit.dto.MorningCardDTO;
 import com.habit.entity.Habit;
+import com.habit.event.CheckinChangedEvent;
 import com.habit.mapper.HabitMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,9 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
     
     @Autowired
     private CheckinService checkinService;
+    
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
     
     public List<Habit> getHabitList() {
         return this.list(new LambdaQueryWrapper<Habit>()
@@ -52,6 +57,7 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
         habit.setArchiveTime(java.time.LocalDateTime.now());
         this.updateById(habit);
         clearCache();
+        triggerMonthlyStatRecalc();
         return habit;
     }
     
@@ -64,6 +70,7 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
         habit.setArchiveTime(null);
         this.updateById(habit);
         clearCache();
+        triggerMonthlyStatRecalc();
         return habit;
     }
     
@@ -94,6 +101,7 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
         this.save(habit);
         
         clearCache();
+        triggerMonthlyStatRecalc();
         return habit;
     }
     
@@ -139,6 +147,7 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
         this.updateById(habit);
         
         clearCache();
+        triggerMonthlyStatRecalc();
         return habit;
     }
 
@@ -169,6 +178,7 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
         boolean result = this.removeById(id);
         if (result) {
             clearCache();
+            triggerMonthlyStatRecalc();
         }
         return result;
     }
@@ -297,5 +307,11 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
     
     private void clearCache() {
         redisTemplate.delete(HABIT_CACHE_KEY);
+    }
+    
+    private void triggerMonthlyStatRecalc() {
+        LocalDate today = LocalDate.now();
+        eventPublisher.publishEvent(new CheckinChangedEvent(
+            this, today, CheckinChangedEvent.ChangeType.HABIT_CHANGED));
     }
 }
