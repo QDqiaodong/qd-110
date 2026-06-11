@@ -217,7 +217,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useHabitStore } from '@/store/habit'
 import { useChallengeStore } from '@/store/challenge'
@@ -233,6 +233,7 @@ const showCategory = ref(false)
 const showTime = ref(false)
 const editingHabit = ref(null)
 const pickerTime = ref(['00', '00'])
+let savedActiveCategory = null
 
 const timePeriodGroupsForList = computed(() => {
   return store.timePeriodGroups.map(group => ({
@@ -281,6 +282,7 @@ const loadChallenges = async () => {
 }
 
 const editHabit = (habit) => {
+  savedActiveCategory = activeCategory.value
   editingHabit.value = habit
   form.value = { ...habit }
   if (habit.time && typeof habit.time === 'string') {
@@ -309,6 +311,13 @@ const closeForm = () => {
   showAdd.value = false
   editingHabit.value = null
   form.value = { name: '', category: '生活', time: '', remind: false, starred: false, color: '#3b82f6' }
+  if (savedActiveCategory !== null) {
+    const restore = savedActiveCategory
+    savedActiveCategory = null
+    nextTick(() => {
+      activeCategory.value = restore
+    })
+  }
 }
 
 const submitForm = async () => {

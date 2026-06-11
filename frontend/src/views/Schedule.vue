@@ -26,13 +26,13 @@
         @click="selectTemplate(tpl)"
       >
         <div class="template-header">
-          <div class="template-name">{{ tpl.name }}</div>
+          <div class="template-name" :title="tpl.name">{{ tpl.name }}</div>
           <van-tag v-if="store.currentSchedule?.id === tpl.id" type="primary" round size="small">使用中</van-tag>
         </div>
         <div class="schedule-items">
           <div v-for="(item, idx) in tpl.items.slice(0, 4)" :key="idx" class="schedule-item">
             <span class="item-time">{{ item.time }}</span>
-            <span class="item-title">{{ item.title }}</span>
+            <span class="item-title" :title="item.title">{{ item.title }}</span>
           </div>
           <div v-if="tpl.items.length > 4" class="more-items">
             还有 {{ tpl.items.length - 4 }} 项...
@@ -54,7 +54,7 @@
         @click="selectTemplate(tpl)"
       >
         <div class="template-header">
-          <div class="template-name">{{ tpl.name }}</div>
+          <div class="template-name" :title="tpl.name">{{ tpl.name }}</div>
           <div class="template-actions">
             <van-icon name="delete-o" size="18" @click.stop="deleteTemplate(tpl.id)" />
           </div>
@@ -62,7 +62,7 @@
         <div class="schedule-items">
           <div v-for="(item, idx) in tpl.items.slice(0, 4)" :key="idx" class="schedule-item">
             <span class="item-time">{{ item.time }}</span>
-            <span class="item-title">{{ item.title }}</span>
+            <span class="item-title" :title="item.title">{{ item.title }}</span>
           </div>
         </div>
       </div>
@@ -82,7 +82,7 @@
           >
             <div class="timeline-time">{{ item.time }}</div>
             <div class="timeline-dot"></div>
-            <div class="timeline-content">{{ item.title }}</div>
+            <div class="timeline-content" :title="item.title">{{ item.title }}</div>
           </div>
         </div>
       </div>
@@ -254,12 +254,17 @@ const deleteTemplate = async (id) => {
 .template-name {
   font-size: 16px;
   font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .template-actions {
   display: flex;
   gap: 12px;
   color: $text-secondary;
+  flex-shrink: 0;
 }
 
 .schedule-items {
@@ -272,6 +277,7 @@ const deleteTemplate = async (id) => {
   display: flex;
   gap: 12px;
   font-size: 14px;
+  min-width: 0;
   
   .item-time {
     color: $primary-color;
@@ -282,6 +288,10 @@ const deleteTemplate = async (id) => {
   
   .item-title {
     color: $text-secondary;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
@@ -310,6 +320,7 @@ const deleteTemplate = async (id) => {
 .detail-timeline {
   position: relative;
   padding-left: 70px;
+  overflow: hidden;
   
   &::before {
     content: '';
@@ -359,6 +370,9 @@ const deleteTemplate = async (id) => {
   padding: 8px 12px;
   background: #f0f9ff;
   border-radius: 8px;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .add-wrapper {
