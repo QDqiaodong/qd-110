@@ -93,7 +93,7 @@ export const useHabitStore = defineStore('habit', {
       })
       return starred
     },
-    morningCards: (state, getters) => {
+    morningCards(state) {
       const today = dayjs().format('YYYY-MM-DD')
       const todayCheckins = state.checkins[today] || {}
       const starred = state.habits.filter(h => h.starred).map(h => ({
@@ -103,7 +103,7 @@ export const useHabitStore = defineStore('habit', {
 
       const scored = starred.map(h => {
         let score = 0
-        const period = getters.getTimePeriod(h.time)
+        const period = this.getTimePeriod(h.time)
         if (period === 'morning') score += 100
         else if (period === 'daytime') score += 50
         if (!h.completed) score += 200
@@ -129,16 +129,16 @@ export const useHabitStore = defineStore('habit', {
       if (hour >= 10 && hour < 18) return 'daytime'
       return 'night'
     },
-    morningHabits: (state, getters) => {
-      const habits = state.habits.filter(h => getters.getTimePeriod(h.time) === 'morning')
+    morningHabits(state) {
+      const habits = state.habits.filter(h => this.getTimePeriod(h.time) === 'morning')
       return habits.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'))
     },
-    daytimeHabits: (state, getters) => {
-      const habits = state.habits.filter(h => getters.getTimePeriod(h.time) === 'daytime')
+    daytimeHabits(state) {
+      const habits = state.habits.filter(h => this.getTimePeriod(h.time) === 'daytime')
       return habits.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'))
     },
-    nighttimeHabits: (state, getters) => {
-      const habits = state.habits.filter(h => getters.getTimePeriod(h.time) === 'night')
+    nighttimeHabits(state) {
+      const habits = state.habits.filter(h => this.getTimePeriod(h.time) === 'night')
       return habits.sort((a, b) => {
         const aTime = a.time || '99:99'
         const bTime = b.time || '99:99'
@@ -149,10 +149,10 @@ export const useHabitStore = defineStore('habit', {
         return aSort - bSort
       })
     },
-    otherTimeHabits: (state, getters) => {
-      return state.habits.filter(h => getters.getTimePeriod(h.time) === 'other')
+    otherTimeHabits(state) {
+      return state.habits.filter(h => this.getTimePeriod(h.time) === 'other')
     },
-    timePeriodGroups: (state, getters) => {
+    timePeriodGroups(state) {
       const today = dayjs().format('YYYY-MM-DD')
       const todayCheckins = state.checkins[today] || {}
       
@@ -168,9 +168,9 @@ export const useHabitStore = defineStore('habit', {
         return sorted
       }
 
-      const morning = sortByTimeAndCompletion(getters.morningHabits)
-      const daytime = sortByTimeAndCompletion(getters.daytimeHabits)
-      const night = getters.nighttimeHabits.map(h => ({ ...h })).sort((a, b) => {
+      const morning = sortByTimeAndCompletion(this.morningHabits)
+      const daytime = sortByTimeAndCompletion(this.daytimeHabits)
+      const night = this.nighttimeHabits.map(h => ({ ...h })).sort((a, b) => {
         const aCompleted = todayCheckins[a.id] || false
         const bCompleted = todayCheckins[b.id] || false
         if (aCompleted !== bCompleted) {
@@ -182,7 +182,7 @@ export const useHabitStore = defineStore('habit', {
         const bSort = bHour >= 18 ? bHour : bHour + 24
         return aSort - bSort
       })
-      const other = sortByTimeAndCompletion(getters.otherTimeHabits)
+      const other = sortByTimeAndCompletion(this.otherTimeHabits)
 
       return [
         { key: 'morning', title: '🌅 清晨', subtitle: '04:00 - 10:00', habits: morning },
@@ -213,98 +213,102 @@ export const useHabitStore = defineStore('habit', {
       if (!state.currentSchedule || !state.currentSchedule.items) return []
       return [...state.currentSchedule.items].sort((a, b) => a.time.localeCompare(b.time))
     },
-    getHabitsByTimePeriod: (state, getters) => (period) => {
-      const habits = state.habits.filter(h => getters.getTimePeriod(h.time) === period)
-      return habits.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'))
+    getHabitsByTimePeriod(state) {
+      return (period) => {
+        const habits = state.habits.filter(h => this.getTimePeriod(h.time) === period)
+        return habits.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'))
+      }
     },
-    getDeviationAnalysis: (state, getters) => (date = null) => {
-      const targetDate = date || dayjs().format('YYYY-MM-DD')
-      const checkins = state.checkins[targetDate] || {}
-      const scheduleItems = getters.getScheduleItemsByTime
-      const habits = state.habits
-      
-      const periods = [
-        { key: 'morning', title: '🌅 清晨', start: 4, end: 10 },
-        { key: 'daytime', title: '☀️ 白天', start: 10, end: 18 },
-        { key: 'night', title: '🌙 夜间', start: 18, end: 28 }
-      ]
-      
-      const analysis = periods.map(period => {
-        const periodScheduleItems = scheduleItems.filter(item => {
-          const hour = parseInt(item.time.split(':')[0], 10)
-          const adjustedHour = hour < 4 ? hour + 24 : hour
-          return adjustedHour >= period.start && adjustedHour < period.end
+    getDeviationAnalysis(state) {
+      return (date = null) => {
+        const targetDate = date || dayjs().format('YYYY-MM-DD')
+        const checkins = state.checkins[targetDate] || {}
+        const scheduleItems = this.getScheduleItemsByTime
+        const habits = state.habits
+        
+        const periods = [
+          { key: 'morning', title: '🌅 清晨', start: 4, end: 10 },
+          { key: 'daytime', title: '☀️ 白天', start: 10, end: 18 },
+          { key: 'night', title: '🌙 夜间', start: 18, end: 28 }
+        ]
+        
+        const analysis = periods.map(period => {
+          const periodScheduleItems = scheduleItems.filter(item => {
+            const hour = parseInt(item.time.split(':')[0], 10)
+            const adjustedHour = hour < 4 ? hour + 24 : hour
+            return adjustedHour >= period.start && adjustedHour < period.end
+          })
+          
+          const periodHabits = habits.filter(h => {
+            const hPeriod = this.getTimePeriod(h.time)
+            return hPeriod === period.key
+          })
+          
+          const periodCompletedHabits = periodHabits.filter(h => checkins[h.id] === true)
+          const periodMissedHabits = periodHabits.filter(h => checkins[h.id] !== true)
+          
+          let deviationType = 'normal'
+          let deviationDesc = '作息正常'
+          let severity = 0
+          
+          if (periodScheduleItems.length > 5) {
+            deviationType = 'overload'
+            deviationDesc = '任务过度堆叠'
+            severity = 2
+          } else if (periodMissedHabits.length >= 2 && periodHabits.length > 0) {
+            deviationType = 'procrastination'
+            deviationDesc = '存在拖延情况'
+            severity = 1
+          } else if (periodHabits.length === 0 && periodScheduleItems.length > 0) {
+            deviationType = 'missing'
+            deviationDesc = '有计划但无对应习惯'
+            severity = 1
+          }
+          
+          return {
+            ...period,
+            scheduleItems: periodScheduleItems,
+            habits: periodHabits,
+            completedHabits: periodCompletedHabits,
+            missedHabits: periodMissedHabits,
+            deviationType,
+            deviationDesc,
+            severity,
+            completionRate: periodHabits.length > 0 
+              ? Math.round((periodCompletedHabits.length / periodHabits.length) * 100) 
+              : (periodScheduleItems.length > 0 ? 0 : 100)
+          }
         })
         
-        const periodHabits = habits.filter(h => {
-          const hPeriod = getters.getTimePeriod(h.time)
-          return hPeriod === period.key
-        })
-        
-        const periodCompletedHabits = periodHabits.filter(h => checkins[h.id] === true)
-        const periodMissedHabits = periodHabits.filter(h => checkins[h.id] !== true)
-        
-        let deviationType = 'normal'
-        let deviationDesc = '作息正常'
-        let severity = 0
-        
-        if (periodScheduleItems.length > 5) {
-          deviationType = 'overload'
-          deviationDesc = '任务过度堆叠'
-          severity = 2
-        } else if (periodMissedHabits.length >= 2 && periodHabits.length > 0) {
-          deviationType = 'procrastination'
-          deviationDesc = '存在拖延情况'
-          severity = 1
-        } else if (periodHabits.length === 0 && periodScheduleItems.length > 0) {
-          deviationType = 'missing'
-          deviationDesc = '有计划但无对应习惯'
-          severity = 1
+        const overall = {
+          totalScheduleItems: scheduleItems.length,
+          totalHabits: habits.length,
+          completedHabits: habits.filter(h => checkins[h.id] === true).length,
+          overallRate: habits.length > 0 
+            ? Math.round((habits.filter(h => checkins[h.id] === true).length / habits.length) * 100) 
+            : 0,
+          worstPeriod: analysis.reduce((worst, curr) => 
+            curr.severity > worst.severity ? curr : worst, 
+            analysis[0]
+          ),
+          suggestions: []
         }
         
-        return {
-          ...period,
-          scheduleItems: periodScheduleItems,
-          habits: periodHabits,
-          completedHabits: periodCompletedHabits,
-          missedHabits: periodMissedHabits,
-          deviationType,
-          deviationDesc,
-          severity,
-          completionRate: periodHabits.length > 0 
-            ? Math.round((periodCompletedHabits.length / periodHabits.length) * 100) 
-            : (periodScheduleItems.length > 0 ? 0 : 100)
+        if (overall.worstPeriod.deviationType === 'overload') {
+          overall.suggestions.push(`⚠️ ${overall.worstPeriod.title}时段安排了${overall.worstPeriod.scheduleItems.length}项任务，建议精简至3-4项`)
         }
-      })
-      
-      const overall = {
-        totalScheduleItems: scheduleItems.length,
-        totalHabits: habits.length,
-        completedHabits: habits.filter(h => checkins[h.id] === true).length,
-        overallRate: habits.length > 0 
-          ? Math.round((habits.filter(h => checkins[h.id] === true).length / habits.length) * 100) 
-          : 0,
-        worstPeriod: analysis.reduce((worst, curr) => 
-          curr.severity > worst.severity ? curr : worst, 
-          analysis[0]
-        ),
-        suggestions: []
+        if (overall.worstPeriod.deviationType === 'procrastination') {
+          overall.suggestions.push(`⚠️ ${overall.worstPeriod.title}时段完成率仅${overall.worstPeriod.completionRate}%，建议设置更明确的提醒`)
+        }
+        if (overall.worstPeriod.deviationType === 'missing') {
+          overall.suggestions.push(`💡 ${overall.worstPeriod.title}时段有计划但未设置对应习惯，建议添加相关习惯`)
+        }
+        if (overall.overallRate < 50) {
+          overall.suggestions.push('💪 整体完成率偏低，建议从减少习惯数量开始，聚焦最重要的2-3个习惯')
+        }
+        
+        return { periods: analysis, overall }
       }
-      
-      if (overall.worstPeriod.deviationType === 'overload') {
-        overall.suggestions.push(`⚠️ ${overall.worstPeriod.title}时段安排了${overall.worstPeriod.scheduleItems.length}项任务，建议精简至3-4项`)
-      }
-      if (overall.worstPeriod.deviationType === 'procrastination') {
-        overall.suggestions.push(`⚠️ ${overall.worstPeriod.title}时段完成率仅${overall.worstPeriod.completionRate}%，建议设置更明确的提醒`)
-      }
-      if (overall.worstPeriod.deviationType === 'missing') {
-        overall.suggestions.push(`💡 ${overall.worstPeriod.title}时段有计划但未设置对应习惯，建议添加相关习惯`)
-      }
-      if (overall.overallRate < 50) {
-        overall.suggestions.push('💪 整体完成率偏低，建议从减少习惯数量开始，聚焦最重要的2-3个习惯')
-      }
-      
-      return { periods: analysis, overall }
     },
     getMissedHabitsWithReasons: (state) => (date = null) => {
       const targetDate = date || dayjs().format('YYYY-MM-DD')
@@ -337,40 +341,42 @@ export const useHabitStore = defineStore('habit', {
         .map(([reason, count]) => ({ reason, count }))
         .sort((a, b) => b.count - a.count)
     },
-    getTimeSlotComparison: (state, getters) => (date = null) => {
-      const targetDate = date || dayjs().format('YYYY-MM-DD')
-      const checkins = state.checkins[targetDate] || {}
-      const scheduleItems = getters.getScheduleItemsByTime
-      const habits = state.habits
-      
-      const timeSlots = []
-      
-      scheduleItems.forEach(item => {
-        const hour = parseInt(item.time.split(':')[0], 10)
-        const matchedHabits = habits.filter(h => {
-          if (!h.time) return false
-          const hHour = parseInt(h.time.split(':')[0], 10)
-          return Math.abs(hour - hHour) <= 1
+    getTimeSlotComparison(state) {
+      return (date = null) => {
+        const targetDate = date || dayjs().format('YYYY-MM-DD')
+        const checkins = state.checkins[targetDate] || {}
+        const scheduleItems = this.getScheduleItemsByTime
+        const habits = state.habits
+        
+        const timeSlots = []
+        
+        scheduleItems.forEach(item => {
+          const hour = parseInt(item.time.split(':')[0], 10)
+          const matchedHabits = habits.filter(h => {
+            if (!h.time) return false
+            const hHour = parseInt(h.time.split(':')[0], 10)
+            return Math.abs(hour - hHour) <= 1
+          })
+          
+          timeSlots.push({
+            time: item.time,
+            planned: item.title,
+            actualHabits: matchedHabits.map(h => ({
+              ...h,
+              completed: checkins[h.id] === true
+            })),
+            deviation: matchedHabits.length === 0 
+              ? 'missing' 
+              : matchedHabits.every(h => checkins[h.id] !== true)
+                ? 'missed'
+                : matchedHabits.some(h => checkins[h.id] !== true)
+                  ? 'partial'
+                  : 'completed'
+          })
         })
         
-        timeSlots.push({
-          time: item.time,
-          planned: item.title,
-          actualHabits: matchedHabits.map(h => ({
-            ...h,
-            completed: checkins[h.id] === true
-          })),
-          deviation: matchedHabits.length === 0 
-            ? 'missing' 
-            : matchedHabits.every(h => checkins[h.id] !== true)
-              ? 'missed'
-              : matchedHabits.some(h => checkins[h.id] !== true)
-                ? 'partial'
-                : 'completed'
-        })
-      })
-      
-      return timeSlots
+        return timeSlots
+      }
     }
   },
 
