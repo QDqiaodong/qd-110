@@ -73,7 +73,7 @@
       </div>
       <div class="calendar-grid">
         <div
-          v-for="day in weekStats"
+          v-for="day in calendarStats"
           :key="day.date"
           class="calendar-day"
           :class="{ completed: day.rate >= 80, partial: day.rate > 0 && day.rate < 80 }"
@@ -90,12 +90,14 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useHabitStore } from '@/store/habit'
+import { statsApi } from '@/utils/request'
 import * as echarts from 'echarts'
 
 const router = useRouter()
 const store = useHabitStore()
 const statsType = ref('week')
 const chartRef = ref(null)
+const monthlyTrend = ref([])
 let chartInstance = null
 
 const totalHabits = computed(() => store.habits.length)
@@ -113,8 +115,30 @@ const avgRate = computed(() => {
 const weekStats = computed(() => store.weekStats)
 
 const monthDayCount = computed(() => {
-  const daysInMonth = new Date().getDate()
-  return Math.min(daysInMonth, 30)
+  if (monthlyTrend.value.length > 0) {
+    return monthlyTrend.value.length
+  }
+  return new Date().getDate()
+})
+
+const calendarStats = computed(() => {
+  if (statsType.value === 'week') {
+    return weekStats.value
+  }
+
+  if (monthlyTrend.value.length > 0) {
+    return monthlyTrend.value.map(item => ({
+      date: item.date,
+      label: `${item.day}日`,
+      rate: item.rate
+    }))
+  }
+
+  return getLocalMonthCalendarData().map((item, index) => ({
+    date: `local-${index}`,
+    label: item.label,
+    rate: item.rate
+  }))
 })
 
 const habitStats = computed(() => {
@@ -144,6 +168,7 @@ onMounted(() => {
 
 const initData = async () => {
   await store.loadHabits()
+  await loadMonthlyStat()
   nextTick(() => {
     initChart()
   })
@@ -160,6 +185,20 @@ const initChart = () => {
   chartInstance = echarts.init(chartRef.value)
   updateChart()
   window.addEventListener('resize', () => chartInstance?.resize())
+}
+
+const loadMonthlyStat = async () => {
+  try {
+    const now = new Date()
+    const res = await statsApi.getMonthlyStat(now.getFullYear(), now.getMonth() + 1)
+    const trendData = res?.data?.trendData
+    monthlyTrend.value = Array.isArray(trendData)
+      ? trendData
+      : JSON.parse(trendData || '[]')
+  } catch (error) {
+    console.error('加载月统计失败，回退到本地数据', error)
+    monthlyTrend.value = []
+  }
 }
 
 const updateChart = () => {
@@ -217,17 +256,31 @@ const getWeekData = () => {
 }
 
 const getMonthData = () => {
+  if (monthlyTrend.value.length > 0) {
+    return {
+      labels: monthlyTrend.value.map(item => `${item.day}日`),
+      values: monthlyTrend.value.map(item => item.rate)
+    }
+  }
+
+  const localData = getLocalMonthCalendarData()
+  return {
+    labels: localData.map(item => item.label),
+    values: localData.map(item => item.rate)
+  }
+}
+
+const getLocalMonthCalendarData = () => {
   const labels = []
-  const values = []
   const daysInMonth = new Date().getDate()
-  const sampleDays = Math.min(daysInMonth, 30)
   const activeIds = store.habits.map(h => h.id)
+  const values = []
   
-  for (let i = sampleDays - 1; i >= 0; i -= 2) {
+  for (let i = daysInMonth - 1; i >= 0; i--) {
     const date = new Date()
     date.setDate(date.getDate() - i)
     const dateStr = date.toISOString().split('T')[0]
-    labels.push(date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }))
+    labels.push(`${date.getDate()}日`)
     
     const checkins = store.checkins[dateStr] || {}
     const completed = Object.entries(checkins).filter(([id, v]) => v && activeIds.includes(Number(id))).length
@@ -235,7 +288,10 @@ const getMonthData = () => {
     values.push(rate)
   }
   
-  return { labels, values }
+  return labels.map((label, index) => ({
+    label,
+    rate: values[index]
+  }))
 }
 
 const getCategoryIcon = (category) => {

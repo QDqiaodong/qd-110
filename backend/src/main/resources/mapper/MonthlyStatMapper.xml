@@ -11,10 +11,10 @@
     
     <select id="selectByDateRange" resultType="com.habit.entity.MonthlyStat">
         SELECT * FROM monthly_stat
-        WHERE (stat_year > #{startDate.year} 
-               OR (stat_year = #{startDate.year} AND stat_month >= #{startDate.monthValue}))
-          AND (stat_year < #{endDate.year} 
-               OR (stat_year = #{endDate.year} AND stat_month <= #{endDate.monthValue}))
+        WHERE (stat_year &gt; #{startDate.year} 
+               OR (stat_year = #{startDate.year} AND stat_month &gt;= #{startDate.monthValue}))
+          AND (stat_year &lt; #{endDate.year} 
+               OR (stat_year = #{endDate.year} AND stat_month &lt;= #{endDate.monthValue}))
         AND deleted = 0
         ORDER BY stat_year ASC, stat_month ASC
     </select>
