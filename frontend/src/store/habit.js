@@ -22,43 +22,85 @@ export const useHabitStore = defineStore('habit', {
     habitDetails: {},
     missReasonPresets: ['加班', '出门', '忘记', '状态差'],
     templates: [
-      { id: 1, name: '早起作息', items: [
-        { time: '06:00', title: '起床洗漱' },
-        { time: '06:30', title: '晨练运动' },
-        { time: '07:30', title: '早餐' },
-        { time: '08:30', title: '开始工作/学习' },
-        { time: '12:00', title: '午餐休息' },
-        { time: '14:00', title: '下午工作/学习' },
-        { time: '18:00', title: '晚餐' },
-        { time: '19:00', title: '自由活动' },
-        { time: '22:00', title: '准备睡觉' },
-        { time: '22:30', title: '入睡' }
-      ]},
-      { id: 2, name: '学生作息', items: [
-        { time: '07:00', title: '起床早餐' },
-        { time: '08:00', title: '早读' },
-        { time: '08:30', title: '上午课程' },
-        { time: '12:00', title: '午餐' },
-        { time: '13:00', title: '午休' },
-        { time: '14:00', title: '下午课程' },
-        { time: '18:00', title: '晚餐' },
-        { time: '19:00', title: '晚自习' },
-        { time: '21:30', title: '自由活动' },
-        { time: '23:00', title: '睡觉' }
-      ]},
-      { id: 3, name: '健身作息', items: [
-        { time: '06:30', title: '起床' },
-        { time: '07:00', title: '晨跑30分钟' },
-        { time: '08:00', title: '早餐+蛋白质补充' },
-        { time: '09:00', title: '工作/学习' },
-        { time: '12:00', title: '午餐（高蛋白）' },
-        { time: '13:00', title: '午休' },
-        { time: '14:00', title: '工作/学习' },
-        { time: '17:30', title: '健身房训练' },
-        { time: '19:30', title: '晚餐' },
-        { time: '20:30', title: '拉伸放松' },
-        { time: '22:30', title: '睡觉' }
-      ]}
+      { id: 1, name: '早起作息',
+        weekdayItems: [
+          { time: '06:00', title: '起床洗漱' },
+          { time: '06:30', title: '晨练运动' },
+          { time: '07:30', title: '早餐' },
+          { time: '08:30', title: '开始工作/学习' },
+          { time: '12:00', title: '午餐休息' },
+          { time: '14:00', title: '下午工作/学习' },
+          { time: '18:00', title: '晚餐' },
+          { time: '19:00', title: '自由活动' },
+          { time: '22:00', title: '准备睡觉' },
+          { time: '22:30', title: '入睡' }
+        ],
+        weekendItems: [
+          { time: '08:00', title: '自然醒起床' },
+          { time: '08:30', title: '悠闲早餐' },
+          { time: '09:30', title: '晨间运动/散步' },
+          { time: '11:00', title: '处理家务' },
+          { time: '12:30', title: '午餐' },
+          { time: '14:00', title: '午休/阅读' },
+          { time: '16:00', title: '兴趣爱好时间' },
+          { time: '18:30', title: '晚餐' },
+          { time: '20:00', title: '休闲娱乐' },
+          { time: '23:00', title: '准备睡觉' }
+        ]
+      },
+      { id: 2, name: '学生作息',
+        weekdayItems: [
+          { time: '07:00', title: '起床早餐' },
+          { time: '08:00', title: '早读' },
+          { time: '08:30', title: '上午课程' },
+          { time: '12:00', title: '午餐' },
+          { time: '13:00', title: '午休' },
+          { time: '14:00', title: '下午课程' },
+          { time: '18:00', title: '晚餐' },
+          { time: '19:00', title: '晚自习' },
+          { time: '21:30', title: '自由活动' },
+          { time: '23:00', title: '睡觉' }
+        ],
+        weekendItems: [
+          { time: '09:00', title: '起床' },
+          { time: '09:30', title: '早餐' },
+          { time: '10:30', title: '作业复习' },
+          { time: '12:30', title: '午餐' },
+          { time: '14:00', title: '午休' },
+          { time: '15:30', title: '户外运动' },
+          { time: '18:00', title: '晚餐' },
+          { time: '19:30', title: '休闲娱乐' },
+          { time: '22:00', title: '准备睡觉' },
+          { time: '22:30', title: '入睡' }
+        ]
+      },
+      { id: 3, name: '健身作息',
+        weekdayItems: [
+          { time: '06:30', title: '起床' },
+          { time: '07:00', title: '晨跑30分钟' },
+          { time: '08:00', title: '早餐+蛋白质补充' },
+          { time: '09:00', title: '工作/学习' },
+          { time: '12:00', title: '午餐（高蛋白）' },
+          { time: '13:00', title: '午休' },
+          { time: '14:00', title: '工作/学习' },
+          { time: '17:30', title: '健身房训练' },
+          { time: '19:30', title: '晚餐' },
+          { time: '20:30', title: '拉伸放松' },
+          { time: '22:30', title: '睡觉' }
+        ],
+        weekendItems: [
+          { time: '07:30', title: '起床' },
+          { time: '08:00', title: '轻量早餐' },
+          { time: '09:00', title: '长时间户外训练' },
+          { time: '11:30', title: '补充营养' },
+          { time: '13:00', title: '午餐' },
+          { time: '14:30', title: '午休' },
+          { time: '16:00', title: '主动恢复/瑜伽' },
+          { time: '18:00', title: '晚餐（欺骗餐）' },
+          { time: '20:00', title: '休闲放松' },
+          { time: '22:30', title: '睡觉' }
+        ]
+      }
     ]
   }),
 
@@ -210,8 +252,26 @@ export const useHabitStore = defineStore('habit', {
       return stats
     },
     getScheduleItemsByTime: (state) => {
-      if (!state.currentSchedule || !state.currentSchedule.items) return []
-      return [...state.currentSchedule.items].sort((a, b) => a.time.localeCompare(b.time))
+      if (!state.currentSchedule) return []
+      const items = state.currentSchedule.weekdayItems || state.currentSchedule.items || []
+      return [...items].sort((a, b) => a.time.localeCompare(b.time))
+    },
+    getWeekdayItems: (state) => {
+      if (!state.currentSchedule) return []
+      const items = state.currentSchedule.weekdayItems || state.currentSchedule.items || []
+      return [...items].sort((a, b) => a.time.localeCompare(b.time))
+    },
+    getWeekendItems: (state) => {
+      if (!state.currentSchedule) return []
+      const items = state.currentSchedule.weekendItems || state.currentSchedule.items || []
+      return [...items].sort((a, b) => a.time.localeCompare(b.time))
+    },
+    isWeekend: () => {
+      const day = dayjs().day()
+      return day === 0 || day === 6
+    },
+    getTodayItems: (state, getters) => {
+      return getters.isWeekend ? getters.getWeekendItems : getters.getWeekdayItems
     },
     getHabitsByTimePeriod(state) {
       return (period) => {
@@ -223,7 +283,15 @@ export const useHabitStore = defineStore('habit', {
       return (date = null) => {
         const targetDate = date || dayjs().format('YYYY-MM-DD')
         const checkins = state.checkins[targetDate] || {}
-        const scheduleItems = this.getScheduleItemsByTime
+        const dayOfWeek = dayjs(targetDate).day()
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+        let scheduleItems
+        if (isWeekend) {
+          scheduleItems = state.currentSchedule?.weekendItems || state.currentSchedule?.items || []
+        } else {
+          scheduleItems = state.currentSchedule?.weekdayItems || state.currentSchedule?.items || []
+        }
+        scheduleItems = [...scheduleItems].sort((a, b) => a.time.localeCompare(b.time))
         const habits = state.habits
         
         const periods = [
@@ -345,7 +413,15 @@ export const useHabitStore = defineStore('habit', {
       return (date = null) => {
         const targetDate = date || dayjs().format('YYYY-MM-DD')
         const checkins = state.checkins[targetDate] || {}
-        const scheduleItems = this.getScheduleItemsByTime
+        const dayOfWeek = dayjs(targetDate).day()
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+        let scheduleItems
+        if (isWeekend) {
+          scheduleItems = state.currentSchedule?.weekendItems || state.currentSchedule?.items || []
+        } else {
+          scheduleItems = state.currentSchedule?.weekdayItems || state.currentSchedule?.items || []
+        }
+        scheduleItems = [...scheduleItems].sort((a, b) => a.time.localeCompare(b.time))
         const habits = state.habits
         
         const timeSlots = []
@@ -799,11 +875,78 @@ export const useHabitStore = defineStore('habit', {
       this.saveToCache()
     },
 
+    analyzeTemplateConflicts(newTemplate) {
+      const habits = this.habits.filter(h => h.time)
+      const newItems = (newTemplate.weekdayItems || newTemplate.items || [])
+      
+      const conflicts = {
+        overloadedSlots: [],
+        unplaceableHabits: [],
+        totalConflicts: 0
+      }
+      
+      const slotMap = {}
+      newItems.forEach(item => {
+        const hour = parseInt(item.time.split(':')[0], 10)
+        const slotKey = `${hour}:00`
+        if (!slotMap[slotKey]) {
+          slotMap[slotKey] = { time: item.time, habits: [], scheduleItems: [] }
+        }
+        slotMap[slotKey].scheduleItems.push(item)
+      })
+      
+      habits.forEach(habit => {
+        const habitHour = parseInt(habit.time.split(':')[0], 10)
+        const slotKey = `${habitHour}:00`
+        
+        if (!slotMap[slotKey]) {
+          let nearestSlot = null
+          let minDiff = 999
+          Object.keys(slotMap).forEach(key => {
+            const slotHour = parseInt(key.split(':')[0], 10)
+            const diff = Math.abs(slotHour - habitHour)
+            if (diff < minDiff) {
+              minDiff = diff
+              nearestSlot = key
+            }
+          })
+          
+          conflicts.unplaceableHabits.push({
+            habit,
+            nearestSlot: nearestSlot ? slotMap[nearestSlot].time : null,
+            nearestDiff: minDiff
+          })
+        } else {
+          slotMap[slotKey].habits.push(habit)
+        }
+      })
+      
+      Object.values(slotMap).forEach(slot => {
+        if (slot.habits.length >= 3) {
+          conflicts.overloadedSlots.push({
+            time: slot.time,
+            habitCount: slot.habits.length,
+            scheduleItemCount: slot.scheduleItems.length,
+            habits: slot.habits,
+            scheduleItems: slot.scheduleItems
+          })
+        }
+      })
+      
+      conflicts.totalConflicts = conflicts.overloadedSlots.length + conflicts.unplaceableHabits.length
+      
+      return conflicts
+    },
+
     addCustomSchedule(schedule) {
       const newSchedule = {
         id: Date.now(),
         ...schedule,
         isCustom: true
+      }
+      if (newSchedule.items && !newSchedule.weekdayItems) {
+        newSchedule.weekdayItems = [...newSchedule.items]
+        newSchedule.weekendItems = [...newSchedule.items]
       }
       this.schedules.push(newSchedule)
       this.saveToCache()

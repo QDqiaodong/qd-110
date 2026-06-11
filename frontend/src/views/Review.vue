@@ -22,6 +22,12 @@
       </div>
     </div>
 
+    <div class="day-type-indicator" :class="isWeekend ? 'weekend' : 'weekday'">
+      <span class="day-icon">{{ isWeekend ? '🌴' : '📅' }}</span>
+      <span class="day-label">{{ isWeekend ? '休息日模式 · 周六/周日' : '工作日模式 · 周一至周五' }}</span>
+      <span class="day-template">{{ currentScheduleName }} · {{ isWeekend ? '周末' : '平日' }}安排</span>
+    </div>
+
     <div class="overview-section">
       <div class="overview-header">
         <div class="overview-title">📊 今日概览</div>
@@ -337,6 +343,11 @@ const selectedDateLabel = computed(() => {
   return date.format('YYYY年MM月DD日')
 })
 
+const isWeekend = computed(() => {
+  const day = dayjs(selectedDate.value).day()
+  return day === 0 || day === 6
+})
+
 const currentScheduleName = computed(() => {
   return store.currentSchedule?.name || '未选择'
 })
@@ -451,6 +462,60 @@ onMounted(() => {
   
   &:active {
     background: #e5e7eb;
+  }
+}
+
+.day-type-indicator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  
+  &.weekday {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border: 1px solid #bfdbfe;
+    
+    .day-icon {
+      color: #3b82f6;
+    }
+    .day-label {
+      color: #1d4ed8;
+    }
+    .day-template {
+      color: #60a5fa;
+    }
+  }
+  
+  &.weekend {
+    background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+    border: 1px solid #ddd6fe;
+    
+    .day-icon {
+      color: #8b5cf6;
+    }
+    .day-label {
+      color: #7c3aed;
+    }
+    .day-template {
+      color: #c084fc;
+    }
+  }
+  
+  .day-icon {
+    font-size: 28px;
+    flex-shrink: 0;
+  }
+  
+  .day-label {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  
+  .day-template {
+    font-size: 12px;
   }
 }
 
