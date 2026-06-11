@@ -1,6 +1,7 @@
 package com.habit.controller;
 
 import com.habit.dto.HabitDTO;
+import com.habit.dto.MorningCardDTO;
 import com.habit.dto.Result;
 import com.habit.entity.Habit;
 import com.habit.service.HabitService;
@@ -25,6 +26,12 @@ public class HabitController {
     public Result<List<Habit>> getHabitList() {
         List<Habit> habits = habitService.getHabitList();
         return Result.success(habits);
+    }
+    
+    @GetMapping("/morning-cards")
+    public Result<List<MorningCardDTO>> getMorningCards() {
+        List<MorningCardDTO> cards = habitService.getMorningCards();
+        return Result.success(cards);
     }
     
     @PostMapping

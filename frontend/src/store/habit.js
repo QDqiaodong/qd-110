@@ -12,6 +12,7 @@ export const useHabitStore = defineStore('habit', {
     schedules: [],
     currentSchedule: null,
     starredOrder: [],
+    morningCards: [],
     habitsLoaded: false,
     _loadHabitsVersion: 0,
     _togglingHabits: new Set(),
@@ -89,6 +90,32 @@ export const useHabitStore = defineStore('habit', {
         return aOrder - bOrder
       })
       return starred
+    },
+    morningCards: (state, getters) => {
+      const today = dayjs().format('YYYY-MM-DD')
+      const todayCheckins = state.checkins[today] || {}
+      const starred = state.habits.filter(h => h.starred).map(h => ({
+        ...h,
+        completed: !!todayCheckins[h.id]
+      }))
+
+      const scored = starred.map(h => {
+        let score = 0
+        const period = getters.getTimePeriod(h.time)
+        if (period === 'morning') score += 100
+        else if (period === 'daytime') score += 50
+        if (!h.completed) score += 200
+        const orderIdx = state.starredOrder.indexOf(h.id)
+        score += orderIdx >= 0 ? (100 - orderIdx) : 0
+        return { ...h, score }
+      })
+
+      scored.sort((a, b) => {
+        if (a.completed !== b.completed) return a.completed ? 1 : -1
+        return b.score - a.score
+      })
+
+      return scored.slice(0, 3)
     },
     nonStarredHabits: (state) => {
       return state.habits.filter(h => !h.starred)

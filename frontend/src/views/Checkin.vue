@@ -10,6 +10,49 @@
       </van-circle>
     </div>
 
+    <div v-if="store.morningCards.length > 0" class="morning-cards-section">
+      <div class="morning-cards-header">
+        <div class="morning-cards-title">
+          <span class="morning-icon">☀️</span>
+          晨间提醒
+        </div>
+        <div class="morning-cards-subtitle">今日重点 · {{ morningCompletedCount }}/{{ store.morningCards.length }} 已完成</div>
+      </div>
+      <div class="morning-cards-list">
+        <div
+          v-for="card in store.morningCards"
+          :key="card.id"
+          class="morning-card"
+          :class="{ completed: card.completed }"
+          @click="toggleCheckin(card.id)"
+        >
+          <div class="morning-card-icon" :style="{ background: card.color + '20', color: card.color }">
+            {{ getCategoryIcon(card.category) }}
+          </div>
+          <div class="morning-card-content">
+            <div class="morning-card-name">{{ card.name }}</div>
+            <div class="morning-card-meta">
+              <span v-if="card.time" class="morning-card-time">{{ card.time }}</span>
+              <span class="morning-card-category">{{ card.category }}</span>
+            </div>
+          </div>
+          <div class="morning-card-status">
+            <div v-if="card.completed" class="status-done">
+              <van-icon name="success" />
+              <span>已完成</span>
+            </div>
+            <div v-else class="status-pending">
+              <div class="pending-circle" :style="{ borderColor: card.color }" />
+              <span>待完成</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-if="morningAllDone" class="morning-cards-cheer">
+        🎉 今日重点已全部完成，继续保持！
+      </div>
+    </div>
+
     <div class="view-toggle">
       <van-radio-group v-model="viewMode" direction="horizontal" shape="round">
         <van-radio name="time">
@@ -311,6 +354,10 @@ const pickerTime = ref(['00', '00'])
 
 const totalHabits = computed(() => store.habits.length)
 
+const morningCompletedCount = computed(() => store.morningCards.filter(c => c.completed).length)
+
+const morningAllDone = computed(() => store.morningCards.length > 0 && morningCompletedCount.value === store.morningCards.length)
+
 const todayStr = computed(() => dayjs().format('YYYY年MM月DD日 dddd'))
 
 const categories = ['生活', '学习', '作息', '健康', '工作', '运动', '阅读', '其他']
@@ -503,6 +550,169 @@ const habitMilestoneMessage = computed(() => {
 </script>
 
 <style lang="scss" scoped>
+.morning-cards-section {
+  background: linear-gradient(135deg, #fef3c7 0%, #fff7ed 50%, #fef9c3 100%);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid #fde68a;
+  box-shadow: 0 4px 16px rgba(251, 191, 36, 0.12);
+}
+
+.morning-cards-header {
+  margin-bottom: 12px;
+}
+
+.morning-cards-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #92400e;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  .morning-icon {
+    font-size: 20px;
+  }
+}
+
+.morning-cards-subtitle {
+  font-size: 12px;
+  color: #b45309;
+  margin-top: 2px;
+}
+
+.morning-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.morning-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 12px;
+  transition: all 0.2s;
+  border-left: 3px solid #f59e0b;
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &.completed {
+    opacity: 0.6;
+    border-left-color: #d1d5db;
+
+    .morning-card-name {
+      text-decoration: line-through;
+      color: $text-secondary;
+    }
+  }
+}
+
+.morning-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  @include flex-center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.morning-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.morning-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: $text-primary;
+  margin-bottom: 2px;
+}
+
+.morning-card-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: $text-secondary;
+}
+
+.morning-card-time {
+  font-weight: 500;
+  color: #b45309;
+}
+
+.morning-card-status {
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.status-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: $success-color;
+
+  .van-icon {
+    font-size: 22px;
+  }
+
+  span {
+    font-size: 10px;
+    font-weight: 500;
+  }
+}
+
+.status-pending {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: $text-secondary;
+
+  span {
+    font-size: 10px;
+    font-weight: 500;
+  }
+}
+
+.pending-circle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid;
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.3;
+  }
+}
+
+.morning-cards-cheer {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400e;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+}
+
 .view-toggle {
   margin-bottom: 16px;
   

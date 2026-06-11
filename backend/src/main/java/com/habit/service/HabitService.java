@@ -3,13 +3,19 @@ package com.habit.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.habit.dto.HabitDTO;
+import com.habit.dto.MorningCardDTO;
 import com.habit.entity.Habit;
 import com.habit.mapper.HabitMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class HabitService extends ServiceImpl<HabitMapper, Habit> {
@@ -203,6 +209,78 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
         
         clearCache();
         return true;
+    }
+    
+    public List<MorningCardDTO> getMorningCards() {
+        List<Habit> starredHabits = this.list(new LambdaQueryWrapper<Habit>()
+                .eq(Habit::getStarred, true)
+                .eq(Habit::getArchived, false)
+                .orderByAsc(Habit::getSortOrder)
+                .orderByDesc(Habit::getCreateTime));
+        
+        if (starredHabits.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        Map<Long, Boolean> todayCheckins = checkinService.getCheckinsByDate(LocalDate.now());
+        
+        List<Habit> morningHabits = starredHabits.stream()
+                .filter(h -> isMorningHabit(h.getTime()))
+                .sorted(Comparator.comparingInt((Habit h) -> h.getSortOrder() == null ? 999 : h.getSortOrder()))
+                .collect(Collectors.toList());
+        
+        List<Habit> otherStarredHabits = starredHabits.stream()
+                .filter(h -> !isMorningHabit(h.getTime()))
+                .sorted(Comparator.comparingInt((Habit h) -> h.getSortOrder() == null ? 999 : h.getSortOrder()))
+                .collect(Collectors.toList());
+        
+        List<Habit> prioritized = new ArrayList<>();
+        prioritized.addAll(morningHabits);
+        prioritized.addAll(otherStarredHabits);
+        
+        int limit = Math.min(3, prioritized.size());
+        List<Habit> selected = prioritized.subList(0, limit);
+        
+        return selected.stream()
+                .map(habit -> convertToMorningCard(habit, todayCheckins.get(habit.getId())))
+                .collect(Collectors.toList());
+    }
+    
+    private boolean isMorningHabit(String time) {
+        if (time == null || time.isEmpty()) {
+            return false;
+        }
+        try {
+            int hour = Integer.parseInt(time.split(":")[0]);
+            return hour >= 4 && hour < 10;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    private MorningCardDTO convertToMorningCard(Habit habit, Boolean completed) {
+        MorningCardDTO dto = new MorningCardDTO();
+        dto.setId(habit.getId());
+        dto.setName(habit.getName());
+        dto.setCategory(habit.getCategory());
+        dto.setTime(habit.getTime());
+        dto.setColor(habit.getColor());
+        dto.setCompleted(completed != null && completed);
+        dto.setIcon(getCategoryIcon(habit.getCategory()));
+        return dto;
+    }
+    
+    private String getCategoryIcon(String category) {
+        return switch (category) {
+            case "生活" -> "🏠";
+            case "学习" -> "📚";
+            case "作息" -> "⏰";
+            case "健康" -> "💪";
+            case "工作" -> "💼";
+            case "运动" -> "🏃";
+            case "阅读" -> "📖";
+            default -> "✨";
+        };
     }
     
     private Integer getMaxStarredSortOrder() {

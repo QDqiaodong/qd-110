@@ -28,6 +28,7 @@ request.interceptors.response.use(
 
 export const habitApi = {
   getList: () => request.get('/habits'),
+  getMorningCards: () => request.get('/habits/morning-cards'),
   create: (data) => request.post('/habits', data),
   update: (id, data) => request.put(`/habits/${id}`, data),
   delete: (id) => request.delete(`/habits/${id}`),
