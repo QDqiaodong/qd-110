@@ -470,9 +470,6 @@ export const useHabitStore = defineStore('habit', {
           this.schedules = data.schedules || []
           this.currentSchedule = data.currentSchedule || this.templates[0]
           this.starredOrder = data.starredOrder || []
-          if (this.habits.length > 0) {
-            this.habitsLoaded = true
-          }
         } else {
           this.initDefaultData()
         }

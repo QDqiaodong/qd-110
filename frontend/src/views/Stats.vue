@@ -34,7 +34,7 @@
     <div class="chart-section">
       <div class="section-header">
         <div class="section-title">
-          <van-radio-group v-model:active="statsType" direction="horizontal">
+          <van-radio-group v-model="statsType" direction="horizontal">
             <van-radio name="week">本周</van-radio>
             <van-radio name="month">本月</van-radio>
           </van-radio-group>
