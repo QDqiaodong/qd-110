@@ -34,6 +34,7 @@ export const habitApi = {
   delete: (id) => request.delete(`/habits/${id}`),
   toggleStar: (id) => request.post(`/habits/${id}/star`),
   updateStarredOrder: (habitIds) => request.put('/habits/starred/order', { habitIds }),
+  updateHabitsOrder: (starredIds, nonStarredIds) => request.put('/habits/order', { starredIds, nonStarredIds }),
   getArchivedList: () => request.get('/habits/archived'),
   archive: (id) => request.post(`/habits/${id}/archive`),
   unarchive: (id) => request.post(`/habits/${id}/unarchive`)

@@ -177,6 +177,14 @@
           <span>其他习惯</span>
         </div>
 
+        <div class="section-header non-starred-header" v-if="store.nonStarredHabits.length > 0">
+          <div></div>
+          <div class="section-action" @click="toggleNonStarredSortMode">
+            <van-icon :name="isNonStarredSorting ? 'checked' : 'sort'" />
+            <span>{{ isNonStarredSorting ? '完成' : '排序' }}</span>
+          </div>
+        </div>
+
         <div class="habit-list">
           <div v-if="store.nonStarredHabits.length === 0 && store.starredHabits.length === 0" class="empty-state">
             <div class="empty-icon">📋</div>
@@ -184,12 +192,23 @@
           </div>
           
           <div
-            v-for="habit in store.nonStarredHabits"
+            v-for="(habit, index) in store.nonStarredHabits"
             :key="habit.id"
             class="habit-card"
-            :class="{ completed: isChecked(habit.id) }"
-            @click="toggleCheckin(habit.id)"
+            :class="{ 
+              completed: isChecked(habit.id),
+              sorting: isNonStarredSorting,
+              dragging: nonStarredDragIndex === index
+            }"
+            draggable="true"
+            @dragstart="onNonStarredDragStart($event, index)"
+            @dragover.prevent="onNonStarredDragOver($event, index)"
+            @dragend="onNonStarredDragEnd"
+            @click="!isNonStarredSorting && toggleCheckin(habit.id)"
           >
+            <div v-if="isNonStarredSorting" class="drag-handle">
+              <van-icon name="wap-nav" />
+            </div>
             <div class="habit-left">
               <div class="habit-icon" :style="{ background: habit.color + '20', color: habit.color }">
                 {{ getCategoryIcon(habit.category) }}
@@ -204,7 +223,7 @@
             </div>
             <div class="habit-check">
               <van-icon name="chart-trending-o" class="detail-icon" @click.stop="goToDetail(habit)" />
-              <van-checkbox :model-value="isChecked(habit.id)" :style="{ '--van-checkbox-checked-icon-color': habit.color }" />
+              <van-checkbox :model-value="isChecked(habit.id)" :style="{ '--van-checkbox-checked-icon-color': habit.color }" @click.stop />
             </div>
           </div>
         </div>
@@ -415,6 +434,8 @@ const showCategory = ref(false)
 const showTime = ref(false)
 const isSorting = ref(false)
 const dragIndex = ref(-1)
+const isNonStarredSorting = ref(false)
+const nonStarredDragIndex = ref(-1)
 const togglingHabitIds = ref(new Set())
 const showMilestoneModal = ref(false)
 const showHabitMilestoneModal = ref(false)
@@ -540,6 +561,14 @@ const toggleSortMode = async () => {
   }
 }
 
+const toggleNonStarredSortMode = async () => {
+  isNonStarredSorting.value = !isNonStarredSorting.value
+  if (!isNonStarredSorting.value) {
+    const newOrder = store.nonStarredHabits.map(h => h.id)
+    await store.updateHabitsOrder(null, newOrder)
+  }
+}
+
 const onDragStart = (e, index) => {
   if (!isSorting.value) return
   dragIndex.value = index
@@ -560,6 +589,28 @@ const onDragOver = (e, index) => {
 
 const onDragEnd = () => {
   dragIndex.value = -1
+}
+
+const onNonStarredDragStart = (e, index) => {
+  if (!isNonStarredSorting.value) return
+  nonStarredDragIndex.value = index
+  e.dataTransfer.effectAllowed = 'move'
+}
+
+const onNonStarredDragOver = (e, index) => {
+  if (!isNonStarredSorting.value || nonStarredDragIndex.value === -1 || nonStarredDragIndex.value === index) return
+  
+  const fromIndex = nonStarredDragIndex.value
+  const toIndex = index
+  
+  if (fromIndex !== toIndex) {
+    store.moveNonStarredHabit(fromIndex, toIndex)
+    nonStarredDragIndex.value = toIndex
+  }
+}
+
+const onNonStarredDragEnd = () => {
+  nonStarredDragIndex.value = -1
 }
 
 const milestoneIcon = computed(() => {
@@ -1047,6 +1098,10 @@ const saveMissReasons = async () => {
   gap: 12px;
 }
 
+.non-starred-header {
+  margin-bottom: 10px;
+}
+
 .habit-card {
   @include card;
   padding: 16px;
@@ -1054,6 +1109,7 @@ const saveMissReasons = async () => {
   align-items: center;
   justify-content: space-between;
   transition: all 0.2s;
+  gap: 10px;
   
   &.completed {
     opacity: 0.7;
@@ -1061,6 +1117,19 @@ const saveMissReasons = async () => {
       text-decoration: line-through;
       color: $text-secondary;
     }
+  }
+  
+  &.sorting {
+    cursor: grab;
+    
+    &:active {
+      cursor: grabbing;
+    }
+  }
+  
+  &.dragging {
+    opacity: 0.5;
+    transform: scale(1.02);
   }
   
   &:active {

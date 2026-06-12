@@ -82,6 +82,18 @@ public class HabitController {
         return Result.success();
     }
     
+    @PutMapping("/order")
+    public Result<Void> updateHabitsOrder(@RequestBody Map<String, List<Long>> body) {
+        List<Long> starredIds = body.get("starredIds");
+        List<Long> nonStarredIds = body.get("nonStarredIds");
+        boolean success = habitService.updateHabitsOrder(starredIds, nonStarredIds);
+        if (!success) {
+            return Result.error("更新失败");
+        }
+        statsService.clearStatsCache();
+        return Result.success();
+    }
+    
     @GetMapping("/archived")
     public Result<List<Habit>> getArchivedHabitList() {
         List<Habit> habits = habitService.getArchivedHabitList();

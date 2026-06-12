@@ -108,6 +108,6 @@ CREATE TABLE IF NOT EXISTS monthly_stat (
 
 INSERT INTO habit (name, category, time, remind, color, starred, sort_order) VALUES
 ('早起', '作息', '07:00', 1, '#3b82f6', 1, 1),
-('阅读30分钟', '学习', '20:00', 1, '#10b981', 0, 0),
-('运动锻炼', '健康', '18:00', 0, '#f59e0b', 0, 0),
+('阅读30分钟', '学习', '20:00', 1, '#10b981', 0, 1),
+('运动锻炼', '健康', '18:00', 0, '#f59e0b', 0, 2),
 ('喝8杯水', '健康', NULL, 0, '#06b6d4', 1, 2);

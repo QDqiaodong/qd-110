@@ -95,7 +95,8 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
             Integer maxSort = this.getMaxStarredSortOrder();
             habit.setSortOrder(maxSort != null ? maxSort + 1 : 1);
         } else {
-            habit.setSortOrder(0);
+            Integer maxSort = this.getMaxNonStarredSortOrder();
+            habit.setSortOrder(maxSort != null ? maxSort + 1 : 1);
         }
         
         this.save(habit);
@@ -140,7 +141,8 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
                 Integer maxSort = this.getMaxStarredSortOrder();
                 habit.setSortOrder(maxSort != null ? maxSort + 1 : 1);
             } else if (!dto.getStarred() && wasStarred) {
-                habit.setSortOrder(0);
+                Integer maxSort = this.getMaxNonStarredSortOrder();
+                habit.setSortOrder(maxSort != null ? maxSort + 1 : 1);
             }
         }
         
@@ -196,7 +198,8 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
             Integer maxSort = this.getMaxStarredSortOrder();
             habit.setSortOrder(maxSort != null ? maxSort + 1 : 1);
         } else {
-            habit.setSortOrder(0);
+            Integer maxSort = this.getMaxNonStarredSortOrder();
+            habit.setSortOrder(maxSort != null ? maxSort + 1 : 1);
         }
         
         this.updateById(habit);
@@ -214,6 +217,36 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
             if (habit != null) {
                 habit.setSortOrder(i + 1);
                 this.updateById(habit);
+            }
+        }
+        
+        clearCache();
+        return true;
+    }
+    
+    @Transactional
+    public boolean updateHabitsOrder(List<Long> starredIds, List<Long> nonStarredIds) {
+        if (starredIds == null && nonStarredIds == null) {
+            return false;
+        }
+        
+        if (starredIds != null) {
+            for (int i = 0; i < starredIds.size(); i++) {
+                Habit habit = this.getById(starredIds.get(i));
+                if (habit != null) {
+                    habit.setSortOrder(i + 1);
+                    this.updateById(habit);
+                }
+            }
+        }
+        
+        if (nonStarredIds != null) {
+            for (int i = 0; i < nonStarredIds.size(); i++) {
+                Habit habit = this.getById(nonStarredIds.get(i));
+                if (habit != null) {
+                    habit.setSortOrder(i + 1);
+                    this.updateById(habit);
+                }
             }
         }
         
@@ -301,6 +334,19 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
         
         if (starredHabits != null && !starredHabits.isEmpty()) {
             return starredHabits.get(0).getSortOrder();
+        }
+        return 0;
+    }
+    
+    private Integer getMaxNonStarredSortOrder() {
+        List<Habit> nonStarredHabits = this.list(new LambdaQueryWrapper<Habit>()
+                .eq(Habit::getStarred, false)
+                .eq(Habit::getArchived, false)
+                .orderByDesc(Habit::getSortOrder)
+                .last("LIMIT 1"));
+        
+        if (nonStarredHabits != null && !nonStarredHabits.isEmpty()) {
+            return nonStarredHabits.get(0).getSortOrder();
         }
         return 0;
     }

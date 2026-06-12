@@ -241,6 +241,8 @@ const timePeriodGroupsForList = computed(() => {
     habits: group.habits.slice().sort((a, b) => {
       if (a.starred && !b.starred) return -1
       if (!a.starred && b.starred) return 1
+      const orderDiff = (a.sortOrder || 999) - (b.sortOrder || 999)
+      if (orderDiff !== 0) return orderDiff
       return (a.time || '99:99').localeCompare(b.time || '99:99')
     })
   }))
@@ -260,8 +262,17 @@ const form = ref({
 })
 
 const filteredHabits = computed(() => {
-  if (activeCategory.value === '全部') return store.habits
-  return store.habits.filter(h => h.category === activeCategory.value)
+  let list
+  if (activeCategory.value === '全部') {
+    list = [...store.habits]
+  } else {
+    list = store.habits.filter(h => h.category === activeCategory.value)
+  }
+  return list.sort((a, b) => {
+    if (a.starred && !b.starred) return -1
+    if (!a.starred && b.starred) return 1
+    return (a.sortOrder || 999) - (b.sortOrder || 999)
+  })
 })
 
 onMounted(() => {

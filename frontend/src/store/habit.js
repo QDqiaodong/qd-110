@@ -13,6 +13,7 @@ export const useHabitStore = defineStore('habit', {
     schedules: [],
     currentSchedule: null,
     starredOrder: [],
+    nonStarredOrder: [],
     morningCards: [],
     habitsLoaded: false,
     _loadHabitsVersion: 0,
@@ -162,7 +163,15 @@ export const useHabitStore = defineStore('habit', {
       return scored.slice(0, 3)
     },
     nonStarredHabits: (state) => {
-      return state.habits.filter(h => !h.starred)
+      const nonStarred = state.habits.filter(h => !h.starred).map(h => ({ ...h }))
+      const orderMap = {}
+      state.nonStarredOrder.forEach((id, index) => { orderMap[id] = index })
+      nonStarred.sort((a, b) => {
+        const aOrder = orderMap[a.id] !== undefined ? orderMap[a.id] : 999
+        const bOrder = orderMap[b.id] !== undefined ? orderMap[b.id] : 999
+        return aOrder - bOrder
+      })
+      return nonStarred
     },
     getTimePeriod: () => (time) => {
       if (!time) return 'other'
@@ -470,6 +479,7 @@ export const useHabitStore = defineStore('habit', {
           this.schedules = data.schedules || []
           this.currentSchedule = data.currentSchedule || this.templates[0]
           this.starredOrder = data.starredOrder || []
+          this.nonStarredOrder = data.nonStarredOrder || []
         } else {
           this.initDefaultData()
         }
@@ -487,7 +497,8 @@ export const useHabitStore = defineStore('habit', {
           missReasons: this.missReasons,
           schedules: this.schedules,
           currentSchedule: this.currentSchedule,
-          starredOrder: this.starredOrder
+          starredOrder: this.starredOrder,
+          nonStarredOrder: this.nonStarredOrder
         }))
       } catch (e) {
         console.error('缓存保存失败', e)
@@ -511,13 +522,14 @@ export const useHabitStore = defineStore('habit', {
     },
     initDefaultData() {
       this.habits = [
-        { id: 1, name: '早起', category: '作息', time: '07:00', remind: true, color: '#3b82f6', starred: true, archived: false },
-        { id: 2, name: '阅读30分钟', category: '学习', time: '20:00', remind: true, color: '#10b981', starred: false, archived: false },
-        { id: 3, name: '运动锻炼', category: '健康', time: '18:00', remind: false, color: '#f59e0b', starred: false, archived: false },
-        { id: 4, name: '喝8杯水', category: '健康', time: '', remind: false, color: '#06b6d4', starred: true, archived: false }
+        { id: 1, name: '早起', category: '作息', time: '07:00', remind: true, color: '#3b82f6', starred: true, archived: false, sortOrder: 1 },
+        { id: 2, name: '阅读30分钟', category: '学习', time: '20:00', remind: true, color: '#10b981', starred: false, archived: false, sortOrder: 1 },
+        { id: 3, name: '运动锻炼', category: '健康', time: '18:00', remind: false, color: '#f59e0b', starred: false, archived: false, sortOrder: 2 },
+        { id: 4, name: '喝8杯水', category: '健康', time: '', remind: false, color: '#06b6d4', starred: true, archived: false, sortOrder: 2 }
       ]
       this.archivedHabits = []
       this.starredOrder = [1, 4]
+      this.nonStarredOrder = [2, 3]
       this.currentSchedule = this.templates[0]
       this.habitsLoaded = true
       this.saveToCache()
@@ -538,7 +550,9 @@ export const useHabitStore = defineStore('habit', {
           }
           this.habits = res.data
           const starred = this.habits.filter(h => h.starred).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+          const nonStarred = this.habits.filter(h => !h.starred).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
           this.starredOrder = starred.map(h => h.id)
+          this.nonStarredOrder = nonStarred.map(h => h.id)
           this.habitsLoaded = true
           this.saveToCache()
           return this.habits
@@ -589,6 +603,8 @@ export const useHabitStore = defineStore('habit', {
       this.habits.push(optimisticHabit)
       if (optimisticHabit.starred) {
         this.starredOrder.push(tempId)
+      } else {
+        this.nonStarredOrder.push(tempId)
       }
       this.saveToCache()
       
@@ -602,10 +618,16 @@ export const useHabitStore = defineStore('habit', {
             this.habits[index] = res.data
           }
           this.starredOrder = this.starredOrder.map(id => id === tempId ? res.data.id : id)
+          this.nonStarredOrder = this.nonStarredOrder.map(id => id === tempId ? res.data.id : id)
           if (res.data.starred && !this.starredOrder.includes(res.data.id)) {
             this.starredOrder.push(res.data.id)
           } else if (!res.data.starred) {
             this.starredOrder = this.starredOrder.filter(id => id !== res.data.id)
+          }
+          if (!res.data.starred && !this.nonStarredOrder.includes(res.data.id)) {
+            this.nonStarredOrder.push(res.data.id)
+          } else if (res.data.starred) {
+            this.nonStarredOrder = this.nonStarredOrder.filter(id => id !== res.data.id)
           }
           this.habitsLoaded = true
           this.saveToCache()
@@ -615,6 +637,7 @@ export const useHabitStore = defineStore('habit', {
         console.error('创建习惯失败', e)
         this.habits = this.habits.filter(h => h.id !== tempId)
         this.starredOrder = this.starredOrder.filter(id => id !== tempId)
+        this.nonStarredOrder = this.nonStarredOrder.filter(id => id !== tempId)
         this.saveToCache()
       }
       return optimisticHabit
@@ -650,8 +673,12 @@ export const useHabitStore = defineStore('habit', {
             if (!this.starredOrder.includes(id)) {
               this.starredOrder.push(id)
             }
+            this.nonStarredOrder = this.nonStarredOrder.filter(sid => sid !== id)
           } else {
             this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+            if (!this.nonStarredOrder.includes(id)) {
+              this.nonStarredOrder.push(id)
+            }
           }
         }
         this.saveToCache()
@@ -669,8 +696,12 @@ export const useHabitStore = defineStore('habit', {
               if (!this.starredOrder.includes(id)) {
                 this.starredOrder.push(id)
               }
+              this.nonStarredOrder = this.nonStarredOrder.filter(sid => sid !== id)
             } else {
               this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+              if (!this.nonStarredOrder.includes(id)) {
+                this.nonStarredOrder.push(id)
+              }
             }
           }
           this.saveToCache()
@@ -685,8 +716,12 @@ export const useHabitStore = defineStore('habit', {
             if (!this.starredOrder.includes(id)) {
               this.starredOrder.push(id)
             }
+            this.nonStarredOrder = this.nonStarredOrder.filter(sid => sid !== id)
           } else {
             this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+            if (!this.nonStarredOrder.includes(id)) {
+              this.nonStarredOrder.push(id)
+            }
           }
           this.saveToCache()
         }
@@ -698,10 +733,12 @@ export const useHabitStore = defineStore('habit', {
       const index = this.habits.findIndex(h => h.id === id)
       const oldHabit = index > -1 ? { ...this.habits[index] } : null
       const oldStarredOrder = [...this.starredOrder]
+      const oldNonStarredOrder = [...this.nonStarredOrder]
       const oldCheckins = JSON.parse(JSON.stringify(this.checkins))
       
       this.habits = this.habits.filter(h => h.id !== id)
       this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+      this.nonStarredOrder = this.nonStarredOrder.filter(sid => sid !== id)
       
       const newCheckins = {}
       for (const date in this.checkins) {
@@ -725,6 +762,7 @@ export const useHabitStore = defineStore('habit', {
         if (oldHabit) {
           this.habits.splice(index, 0, oldHabit)
           this.starredOrder = oldStarredOrder
+          this.nonStarredOrder = oldNonStarredOrder
           this.checkins = oldCheckins
           this.saveToCache()
         }
@@ -742,8 +780,12 @@ export const useHabitStore = defineStore('habit', {
           if (!this.starredOrder.includes(id)) {
             this.starredOrder.push(id)
           }
+          this.nonStarredOrder = this.nonStarredOrder.filter(sid => sid !== id)
         } else {
           this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+          if (!this.nonStarredOrder.includes(id)) {
+            this.nonStarredOrder.push(id)
+          }
         }
         this.saveToCache()
       }
@@ -760,8 +802,12 @@ export const useHabitStore = defineStore('habit', {
               if (!this.starredOrder.includes(id)) {
                 this.starredOrder.push(id)
               }
+              this.nonStarredOrder = this.nonStarredOrder.filter(sid => sid !== id)
             } else {
               this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+              if (!this.nonStarredOrder.includes(id)) {
+                this.nonStarredOrder.push(id)
+              }
             }
           }
           this.saveToCache()
@@ -775,8 +821,12 @@ export const useHabitStore = defineStore('habit', {
             if (!this.starredOrder.includes(id)) {
               this.starredOrder.push(id)
             }
+            this.nonStarredOrder = this.nonStarredOrder.filter(sid => sid !== id)
           } else {
             this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+            if (!this.nonStarredOrder.includes(id)) {
+              this.nonStarredOrder.push(id)
+            }
           }
           this.saveToCache()
         }
@@ -799,11 +849,42 @@ export const useHabitStore = defineStore('habit', {
       return false
     },
 
+    async updateHabitsOrder(starredIds, nonStarredIds) {
+      if (starredIds) {
+        this.starredOrder = starredIds
+      }
+      if (nonStarredIds) {
+        this.nonStarredOrder = nonStarredIds
+      }
+      this.saveToCache()
+      
+      try {
+        const res = await habitApi.updateHabitsOrder(
+          starredIds || this.starredOrder, 
+          nonStarredIds || this.nonStarredOrder
+        )
+        if (res.code === 0) {
+          return true
+        }
+      } catch (e) {
+        console.error('更新习惯顺序失败', e)
+      }
+      return false
+    },
+
     moveStarredHabit(fromIndex, toIndex) {
       const result = [...this.starredOrder]
       const [removed] = result.splice(fromIndex, 1)
       result.splice(toIndex, 0, removed)
       this.starredOrder = result
+      this.saveToCache()
+    },
+
+    moveNonStarredHabit(fromIndex, toIndex) {
+      const result = [...this.nonStarredOrder]
+      const [removed] = result.splice(fromIndex, 1)
+      result.splice(toIndex, 0, removed)
+      this.nonStarredOrder = result
       this.saveToCache()
     },
 
@@ -967,10 +1048,12 @@ export const useHabitStore = defineStore('habit', {
       const index = this.habits.findIndex(h => h.id === id)
       const oldHabit = index > -1 ? { ...this.habits[index] } : null
       const oldStarredOrder = [...this.starredOrder]
+      const oldNonStarredOrder = [...this.nonStarredOrder]
       
       if (index > -1) {
         this.habits.splice(index, 1)
         this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+        this.nonStarredOrder = this.nonStarredOrder.filter(sid => sid !== id)
         
         const newCheckins = {}
         for (const date in this.checkins) {
@@ -1003,6 +1086,7 @@ export const useHabitStore = defineStore('habit', {
         if (oldHabit && index > -1) {
           this.habits.splice(index, 0, oldHabit)
           this.starredOrder = oldStarredOrder
+          this.nonStarredOrder = oldNonStarredOrder
           this.saveToCache()
         }
       }
@@ -1030,10 +1114,16 @@ export const useHabitStore = defineStore('habit', {
           } else {
             this.habits.push(habit)
           }
-          if (habit.starred && !this.starredOrder.includes(id)) {
-            this.starredOrder.push(id)
-          } else if (!habit.starred) {
+          if (habit.starred) {
+            if (!this.starredOrder.includes(id)) {
+              this.starredOrder.push(id)
+            }
+            this.nonStarredOrder = this.nonStarredOrder.filter(sid => sid !== id)
+          } else {
             this.starredOrder = this.starredOrder.filter(sid => sid !== id)
+            if (!this.nonStarredOrder.includes(id)) {
+              this.nonStarredOrder.push(id)
+            }
           }
           this.saveToCache()
           return habit
