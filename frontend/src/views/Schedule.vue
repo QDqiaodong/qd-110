@@ -268,14 +268,14 @@
       <div class="add-wrapper">
         <div class="form-header">
           <h3>创建作息模板</h3>
-          <van-icon name="cross" @click="showAdd = false" />
+          <van-icon name="cross" @click="closeAddPopup" />
         </div>
         <van-form @submit="createTemplate">
           <van-cell-group inset>
             <van-field v-model="newTpl.name" label="模板名称" placeholder="请输入模板名称" :rules="[{ required: true }]" />
           </van-cell-group>
           
-          <div class="items-tabs">
+          <div class="timeline-type-tabs">
             <van-radio-group v-model="activeItemTab" direction="horizontal" shape="round">
               <van-radio name="weekday">
                 <span class="radio-text">📅 平日</span>
@@ -286,52 +286,78 @@
             </van-radio-group>
           </div>
 
-          <div v-if="activeItemTab === 'weekday'" class="items-section">
-            <div class="section-title">
-              <span class="title-icon">📅</span>
-              平日时间安排
-            </div>
-            <div class="items-list">
-              <div v-for="(item, idx) in newTpl.weekdayItems" :key="idx" class="item-row">
-                <van-field
-                  v-model="item.time"
-                  placeholder="时间"
-                  readonly
-                  is-link
-                  class="time-input"
-                  @click="editItemTime('weekday', idx)"
-                />
-                <van-field v-model="item.title" placeholder="事项" class="title-input" />
-                <van-icon name="minus" class="remove-btn" @click="removeItem('weekday', idx)" />
+          <div class="timeline-editor-section">
+            <div class="timeline-editor-header">
+              <div class="editor-tip">
+                <van-icon name="info-o" size="14" />
+                <span>拖动节点调整时间 · 双击空白处新增 · 点击节点编辑</span>
+              </div>
+              <div class="editor-legend">
+                <span class="legend-item wake"><i></i>起床</span>
+                <span class="legend-item work"><i></i>工作</span>
+                <span class="legend-item sport"><i></i>运动</span>
+                <span class="legend-item rest"><i></i>休息</span>
+                <span class="legend-item meal"><i></i>用餐</span>
+                <span class="legend-item other"><i></i>其他</span>
               </div>
             </div>
-            <van-button block plain type="primary" icon="plus" size="small" @click="addItem('weekday')">
-              添加事项
-            </van-button>
-          </div>
 
-          <div v-else class="items-section">
-            <div class="section-title">
-              <span class="title-icon">🌴</span>
-              周末时间安排
-            </div>
-            <div class="items-list">
-              <div v-for="(item, idx) in newTpl.weekendItems" :key="idx" class="item-row">
-                <van-field
-                  v-model="item.time"
-                  placeholder="时间"
-                  readonly
-                  is-link
-                  class="time-input"
-                  @click="editItemTime('weekend', idx)"
-                />
-                <van-field v-model="item.title" placeholder="事项" class="title-input" />
-                <van-icon name="minus" class="remove-btn" @click="removeItem('weekend', idx)" />
+            <div 
+              class="timeline-editor"
+              ref="timelineEditorRef"
+              @dblclick="handleTimelineDblClick"
+            >
+              <div class="timeline-axis">
+                <div 
+                  v-for="hour in 24" 
+                  :key="hour - 1" 
+                  class="axis-hour"
+                  :class="{ 'is-now': (hour - 1) === currentHour }"
+                >
+                  <div class="hour-label">{{ formatHourLabel(hour - 1) }}</div>
+                  <div class="hour-line" :class="{ major: (hour - 1) % 6 === 0 }"></div>
+                  <div class="half-hour-line"></div>
+                </div>
+              </div>
+
+              <div class="timeline-content-area">
+                <div 
+                  v-for="(item, idx) in currentEditItems" 
+                  :key="idx"
+                  class="timeline-node"
+                  :class="[getItemCategory(item.title), { dragging: draggingIdx === idx }]"
+                  :style="getNodeStyle(idx)"
+                  @mousedown="startDrag($event, idx)"
+                  @touchstart="startDrag($event, idx)"
+                  @click.stop="editNodeTitle(idx)"
+                >
+                  <div class="node-handle">
+                    <van-icon name="wap-nav" size="12" />
+                  </div>
+                  <div class="node-info">
+                    <div class="node-time">{{ item.time }}</div>
+                    <div class="node-title" v-if="item.title">{{ item.title }}</div>
+                    <div class="node-title placeholder" v-else>点击输入事项</div>
+                  </div>
+                  <div class="node-delete" @click.stop="deleteCurrentItem(idx)">
+                    <van-icon name="cross" size="12" />
+                  </div>
+                </div>
               </div>
             </div>
-            <van-button block plain type="primary" icon="plus" size="small" @click="addItem('weekend')">
-              添加事项
-            </van-button>
+
+            <div class="timeline-editor-footer">
+              <van-button 
+                block 
+                plain 
+                type="primary" 
+                icon="plus" 
+                size="small" 
+                @click="quickAddItem"
+              >
+                快速添加事项
+              </van-button>
+            </div>
           </div>
 
           <div class="form-actions">
@@ -339,6 +365,57 @@
           </div>
         </van-form>
       </div>
+    </van-popup>
+
+    <van-popup v-model:show="showTitleEditor" round position="bottom" :style="{ maxHeight: '40%' }">
+      <div class="title-editor-wrapper">
+        <div class="title-editor-header">
+          <span class="editor-cancel" @click="showTitleEditor = false">取消</span>
+          <span class="editor-title-label">编辑事项</span>
+          <span class="editor-confirm" @click="confirmNodeTitle">确定</span>
+        </div>
+        <div class="title-editor-body">
+          <div class="title-editor-row">
+            <label>时间</label>
+            <van-field
+              v-model="editingNodeTime"
+              readonly
+              is-link
+              @click="showNodeTimePicker = true"
+            />
+          </div>
+          <div class="title-editor-row">
+            <label>事项</label>
+            <van-field
+              v-model="editingNodeTitle"
+              placeholder="请输入事项名称"
+              maxlength="20"
+            />
+          </div>
+          <div class="title-editor-categories">
+            <div 
+              v-for="cat in categoryOptions" 
+              :key="cat.key"
+              class="category-chip"
+              :class="{ active: editingCategory === cat.key }"
+              :style="{ '--cat-color': cat.color }"
+              @click="applyCategoryPreset(cat)"
+            >
+              <span class="cat-icon">{{ cat.icon }}</span>
+              <span class="cat-label">{{ cat.label }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </van-popup>
+
+    <van-popup v-model:show="showNodeTimePicker" round position="bottom">
+      <van-time-picker
+        v-model="pickedTime"
+        title="选择时间"
+        @confirm="confirmNodeTime"
+        @cancel="showNodeTimePicker = false"
+      />
     </van-popup>
 
     <van-popup v-model:show="showTimePicker" round position="bottom">
@@ -419,11 +496,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useHabitStore } from '@/store/habit'
 import { showToast, showConfirmDialog } from 'vant'
 import dayjs from 'dayjs'
+
+const HOUR_HEIGHT = 56
+const MINUTE_HEIGHT = HOUR_HEIGHT / 60
+const TIMELINE_TOP_OFFSET = 8
+const DRAG_THRESHOLD = 5
 
 const router = useRouter()
 const store = useHabitStore()
@@ -444,7 +526,132 @@ const conflicts = ref({
   totalConflicts: 0
 })
 
+const currentHour = computed(() => dayjs().hour())
+const timelineEditorRef = ref(null)
+const showTitleEditor = ref(false)
+const showNodeTimePicker = ref(false)
+const draggingIdx = ref(-1)
+const dragStartY = ref(0)
+const dragStartTop = ref(0)
+const dragStartMinute = ref(0)
+const isDragging = ref(false)
+const editingNodeIdx = ref(-1)
+const editingNodeTime = ref('')
+const editingNodeTitle = ref('')
+const editingCategory = ref('other')
+
+const categoryOptions = [
+  { key: 'wake', label: '起床', icon: '🌅', color: '#f59e0b', keywords: ['起床', '洗漱', '醒', '睡', '入眠'] },
+  { key: 'work', label: '工作', icon: '💼', color: '#3b82f6', keywords: ['工作', '学习', '课', '办公', '会议', '项目', '任务', '作业', '复习', '早读', '晚自', '晚自习'] },
+  { key: 'sport', label: '运动', icon: '🏃', color: '#10b981', keywords: ['运动', '跑', '健身', '训练', '锻炼', '晨练', '瑜伽', '拉伸', '散步', '户外', '游泳'] },
+  { key: 'rest', label: '休息', icon: '😴', color: '#8b5cf6', keywords: ['休息', '午休', '自由', '休闲', '娱乐', '放松', '阅读', '兴趣', '爱好', '游戏', '刷'] },
+  { key: 'meal', label: '用餐', icon: '🍽️', color: '#ef4444', keywords: ['早餐', '午餐', '晚餐', '饭', '用餐', '吃', '餐', '夜宵'] },
+  { key: 'other', label: '其他', icon: '📌', color: '#6b7280', keywords: [] }
+]
+
+const newTpl = ref({
+  name: '',
+  weekdayItems: [
+    { time: '07:00', title: '起床洗漱' },
+    { time: '08:00', title: '早餐' },
+    { time: '09:00', title: '开始工作' },
+    { time: '12:00', title: '午餐' },
+    { time: '14:00', title: '下午工作' },
+    { time: '18:00', title: '晚餐' },
+    { time: '22:00', title: '睡觉' }
+  ],
+  weekendItems: [
+    { time: '09:00', title: '起床' },
+    { time: '10:00', title: '早餐' },
+    { time: '12:30', title: '午餐' },
+    { time: '14:00', title: '午休' },
+    { time: '18:30', title: '晚餐' },
+    { time: '23:00', title: '睡觉' }
+  ]
+})
+
 const historyList = computed(() => store.templateHistoryWithStats || [])
+
+const currentEditItems = computed({
+  get() {
+    const items = activeItemTab.value === 'weekday'
+      ? newTpl.value.weekdayItems
+      : newTpl.value.weekendItems
+    return [...items].sort((a, b) => a.time.localeCompare(b.time))
+  },
+  set(val) {
+    if (activeItemTab.value === 'weekday') {
+      newTpl.value.weekdayItems = val
+    } else {
+      newTpl.value.weekendItems = val
+    }
+  }
+})
+
+watch(activeItemTab, () => {
+  draggingIdx.value = -1
+  isDragging.value = false
+})
+
+onMounted(() => {
+  store.loadFromCache()
+  document.addEventListener('mousemove', handleDragMove)
+  document.addEventListener('mouseup', handleDragEnd)
+  document.addEventListener('touchmove', handleDragMove, { passive: false })
+  document.addEventListener('touchend', handleDragEnd)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousemove', handleDragMove)
+  document.removeEventListener('mouseup', handleDragEnd)
+  document.removeEventListener('touchmove', handleDragMove)
+  document.removeEventListener('touchend', handleDragEnd)
+})
+
+const formatHourLabel = (hour) => {
+  return `${String(hour).padStart(2, '0')}:00`
+}
+
+const timeToMinutes = (timeStr) => {
+  if (!timeStr) return 0
+  const [h, m] = timeStr.split(':').map(n => parseInt(n, 10))
+  return h * 60 + (m || 0)
+}
+
+const minutesToTime = (minutes) => {
+  const m = Math.max(0, Math.min(1439, Math.round(minutes)))
+  const h = Math.floor(m / 60)
+  const mm = m % 60
+  return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+}
+
+const getItemCategory = (title) => {
+  if (!title) return 'other'
+  const t = title.toLowerCase()
+  for (let i = 0; i < categoryOptions.length - 1; i++) {
+    const cat = categoryOptions[i]
+    if (cat.keywords.some(kw => t.includes(kw))) {
+      return cat.key
+    }
+  }
+  return 'other'
+}
+
+const getCategoryColor = (key) => {
+  const cat = categoryOptions.find(c => c.key === key)
+  return cat ? cat.color : '#6b7280'
+}
+
+const getNodeStyle = (idx) => {
+  const items = currentEditItems.value
+  if (!items[idx]) return {}
+  const minutes = timeToMinutes(items[idx].time)
+  const top = TIMELINE_TOP_OFFSET + minutes * MINUTE_HEIGHT
+  return {
+    top: `${top}px`,
+    '--cat-color': getCategoryColor(getItemCategory(items[idx].title))
+  }
+}
 
 const formatHistoryDate = (dateStr) => {
   if (!dateStr) return ''
@@ -457,28 +664,189 @@ const getRateClass = (rate) => {
   return 'rate-low'
 }
 
-const newTpl = ref({
-  name: '',
-  weekdayItems: [
-    { time: '07:00', title: '' },
-    { time: '08:00', title: '' }
-  ],
-  weekendItems: [
-    { time: '09:00', title: '' },
-    { time: '10:00', title: '' }
-  ]
-})
-
-onMounted(() => {
-  store.loadFromCache()
-})
-
 const getWeekdayItems = (tpl) => {
   return tpl.weekdayItems || tpl.items || []
 }
 
 const getWeekendItems = (tpl) => {
   return tpl.weekendItems || tpl.items || []
+}
+
+const getEventY = (e) => {
+  if (e.touches && e.touches.length > 0) {
+    return e.touches[0].clientY
+  }
+  if (e.changedTouches && e.changedTouches.length > 0) {
+    return e.changedTouches[0].clientY
+  }
+  return e.clientY
+}
+
+const startDrag = (e, idx) => {
+  if (e.target.closest('.node-delete') || e.target.closest('.node-info')) {
+    if (!e.target.closest('.node-handle')) return
+  }
+  e.preventDefault()
+  draggingIdx.value = idx
+  isDragging.value = false
+  dragStartY.value = getEventY(e)
+  const items = currentEditItems.value
+  dragStartMinute.value = timeToMinutes(items[idx].time)
+  dragStartTop.value = TIMELINE_TOP_OFFSET + dragStartMinute.value * MINUTE_HEIGHT
+}
+
+const handleDragMove = (e) => {
+  if (draggingIdx.value < 0) return
+  const currentY = getEventY(e)
+  const deltaY = currentY - dragStartY.value
+  if (!isDragging.value && Math.abs(deltaY) < DRAG_THRESHOLD) return
+  if (e.cancelable) e.preventDefault()
+  isDragging.value = true
+  const deltaMinutes = deltaY / MINUTE_HEIGHT
+  const newMinutes = dragStartMinute.value + deltaMinutes
+  const snappedMinutes = Math.round(newMinutes / 5) * 5
+  const clampedMinutes = Math.max(0, Math.min(1439, snappedMinutes))
+  const newTime = minutesToTime(clampedMinutes)
+  const items = activeItemTab.value === 'weekday'
+    ? newTpl.value.weekdayItems
+    : newTpl.value.weekendItems
+  const sourceItems = activeItemTab.value === 'weekday'
+    ? newTpl.value.weekdayItems
+    : newTpl.value.weekendItems
+  const sorted = [...sourceItems].sort((a, b) => a.time.localeCompare(b.time))
+  const originalItem = sorted[draggingIdx.value]
+  const originalIdxInSource = sourceItems.indexOf(originalItem)
+  if (originalIdxInSource >= 0) {
+    sourceItems[originalIdxInSource].time = newTime
+  }
+}
+
+const handleDragEnd = () => {
+  draggingIdx.value = -1
+  isDragging.value = false
+}
+
+const getTimelineClickMinutes = (e) => {
+  if (!timelineEditorRef.value) return null
+  const rect = timelineEditorRef.value.getBoundingClientRect()
+  const clickY = getEventY(e) - rect.top - TIMELINE_TOP_OFFSET
+  if (clickY < 0) return 0
+  const minutes = clickY / MINUTE_HEIGHT
+  const snapped = Math.round(minutes / 5) * 5
+  return Math.max(0, Math.min(1439, snapped))
+}
+
+const handleTimelineDblClick = (e) => {
+  if (e.target.closest('.timeline-node')) return
+  const minutes = getTimelineClickMinutes(e)
+  if (minutes === null) return
+  const newTime = minutesToTime(minutes)
+  const items = activeItemTab.value === 'weekday'
+    ? newTpl.value.weekdayItems
+    : newTpl.value.weekendItems
+  items.push({ time: newTime, title: '' })
+  const newIdx = items.length - 1
+  nextTick(() => {
+    editNodeTitleBySourceIdx(newIdx)
+  })
+}
+
+const quickAddItem = () => {
+  const items = activeItemTab.value === 'weekday'
+    ? newTpl.value.weekdayItems
+    : newTpl.value.weekendItems
+  let newMinutes = 12 * 60
+  if (items.length > 0) {
+    const sorted = [...items].sort((a, b) => a.time.localeCompare(b.time))
+    const lastMinutes = timeToMinutes(sorted[sorted.length - 1].time)
+    newMinutes = Math.min(1439, lastMinutes + 60)
+  }
+  items.push({ time: minutesToTime(newMinutes), title: '' })
+  const newIdx = items.length - 1
+  nextTick(() => {
+    editNodeTitleBySourceIdx(newIdx)
+  })
+}
+
+const editNodeTitle = (sortedIdx) => {
+  if (isDragging.value) return
+  nextTick(() => {
+    const sourceItems = activeItemTab.value === 'weekday'
+      ? newTpl.value.weekdayItems
+      : newTpl.value.weekendItems
+    const sorted = [...sourceItems].sort((a, b) => a.time.localeCompare(b.time))
+    const item = sorted[sortedIdx]
+    const sourceIdx = sourceItems.indexOf(item)
+    if (sourceIdx >= 0) {
+      editNodeTitleBySourceIdx(sourceIdx)
+    }
+  })
+}
+
+const editNodeTitleBySourceIdx = (sourceIdx) => {
+  const items = activeItemTab.value === 'weekday'
+    ? newTpl.value.weekdayItems
+    : newTpl.value.weekendItems
+  editingNodeIdx.value = sourceIdx
+  editingNodeTime.value = items[sourceIdx].time
+  editingNodeTitle.value = items[sourceIdx].title
+  editingCategory.value = getItemCategory(items[sourceIdx].title)
+  showTitleEditor.value = true
+}
+
+const applyCategoryPreset = (cat) => {
+  editingCategory.value = cat.key
+  if (!editingNodeTitle.value || editingNodeTitle.value.trim() === '') {
+    if (cat.key === 'wake') editingNodeTitle.value = '起床'
+    else if (cat.key === 'work') editingNodeTitle.value = '工作'
+    else if (cat.key === 'sport') editingNodeTitle.value = '运动'
+    else if (cat.key === 'rest') editingNodeTitle.value = '休息'
+    else if (cat.key === 'meal') editingNodeTitle.value = '用餐'
+  }
+}
+
+const confirmNodeTitle = () => {
+  if (editingNodeIdx.value < 0) return
+  const items = activeItemTab.value === 'weekday'
+    ? newTpl.value.weekdayItems
+    : newTpl.value.weekendItems
+  if (!editingNodeTitle.value.trim()) {
+    showToast('请输入事项名称')
+    return
+  }
+  items[editingNodeIdx.value].title = editingNodeTitle.value.trim()
+  items[editingNodeIdx.value].time = editingNodeTime.value
+  showTitleEditor.value = false
+  editingNodeIdx.value = -1
+}
+
+const confirmNodeTime = () => {
+  editingNodeTime.value = pickedTime.value
+  showNodeTimePicker.value = false
+}
+
+const deleteCurrentItem = (sortedIdx) => {
+  const sourceItems = activeItemTab.value === 'weekday'
+    ? newTpl.value.weekdayItems
+    : newTpl.value.weekendItems
+  if (sourceItems.length <= 1) {
+    showToast('至少保留一项')
+    return
+  }
+  const sorted = [...sourceItems].sort((a, b) => a.time.localeCompare(b.time))
+  const item = sorted[sortedIdx]
+  const sourceIdx = sourceItems.indexOf(item)
+  if (sourceIdx >= 0) {
+    sourceItems.splice(sourceIdx, 1)
+  }
+}
+
+const closeAddPopup = () => {
+  showAdd.value = false
+  showTitleEditor.value = false
+  showNodeTimePicker.value = false
+  draggingIdx.value = -1
+  isDragging.value = false
 }
 
 const selectTemplate = (tpl) => {
@@ -567,11 +935,26 @@ const createTemplate = () => {
     weekendItems
   })
   
-  showAdd.value = false
+  closeAddPopup()
   newTpl.value = {
     name: '',
-    weekdayItems: [{ time: '07:00', title: '' }, { time: '08:00', title: '' }],
-    weekendItems: [{ time: '09:00', title: '' }, { time: '10:00', title: '' }]
+    weekdayItems: [
+      { time: '07:00', title: '起床洗漱' },
+      { time: '08:00', title: '早餐' },
+      { time: '09:00', title: '开始工作' },
+      { time: '12:00', title: '午餐' },
+      { time: '14:00', title: '下午工作' },
+      { time: '18:00', title: '晚餐' },
+      { time: '22:00', title: '睡觉' }
+    ],
+    weekendItems: [
+      { time: '09:00', title: '起床' },
+      { time: '10:00', title: '早餐' },
+      { time: '12:30', title: '午餐' },
+      { time: '14:00', title: '午休' },
+      { time: '18:30', title: '晚餐' },
+      { time: '23:00', title: '睡觉' }
+    ]
   }
   showToast('创建成功')
 }
@@ -1191,9 +1574,9 @@ const goToReview = () => {
   }
 }
 
-.items-tabs {
+.timeline-type-tabs {
   padding: 0 16px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   
   :deep(.van-radio-group) {
     background: #f3f4f6;
@@ -1233,48 +1616,355 @@ const goToReview = () => {
   color: $text-secondary;
 }
 
-.items-section {
-  padding: 0 16px;
-  margin-top: 16px;
+.timeline-editor-section {
+  padding: 0 4px;
+  margin-top: 8px;
 }
 
-.section-title {
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 12px;
-  color: $text-secondary;
+.timeline-editor-header {
+  padding: 0 12px 10px;
+  border-bottom: 1px solid $border-color;
+  margin-bottom: 10px;
+}
+
+.editor-tip {
   display: flex;
   align-items: center;
   gap: 6px;
+  font-size: 12px;
+  color: $text-secondary;
+  margin-bottom: 10px;
+  opacity: 0.85;
+}
+
+.editor-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
   
-  .title-icon {
-    font-size: 16px;
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: $text-secondary;
+    font-weight: 500;
+    
+    i {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
+    
+    &.wake i { background: #f59e0b; }
+    &.work i { background: #3b82f6; }
+    &.sport i { background: #10b981; }
+    &.rest i { background: #8b5cf6; }
+    &.meal i { background: #ef4444; }
+    &.other i { background: #6b7280; }
   }
 }
 
-.items-list {
+.timeline-editor {
+  position: relative;
+  height: 560px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: linear-gradient(180deg, #fafbff 0%, #ffffff 50%, #fffbf5 100%);
+  border-radius: 12px;
+  border: 1px solid $border-color;
+  display: flex;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+}
+
+.timeline-axis {
+  width: 56px;
+  flex-shrink: 0;
+  position: relative;
+  background: #f9fafb;
+  border-right: 1px solid $border-color;
+}
+
+.axis-hour {
+  height: 56px;
+  position: relative;
+  
+  .hour-label {
+    position: absolute;
+    top: -7px;
+    left: 0;
+    right: 4px;
+    font-size: 10px;
+    color: $text-secondary;
+    font-weight: 500;
+    text-align: right;
+    line-height: 1;
+    padding-top: 3px;
+    padding-right: 6px;
+  }
+  
+  .hour-line {
+    position: absolute;
+    top: 0;
+    left: 52px;
+    right: -100vw;
+    height: 1px;
+    background: $border-color;
+    
+    &.major {
+      background: #d1d5db;
+      height: 1.5px;
+    }
+  }
+  
+  .half-hour-line {
+    position: absolute;
+    top: 28px;
+    left: 52px;
+    right: -100vw;
+    height: 1px;
+    background: #f3f4f6;
+  }
+  
+  &.is-now {
+    .hour-label {
+      color: $primary-color;
+      font-weight: 700;
+    }
+    .hour-line {
+      background: rgba(59, 130, 246, 0.5);
+      height: 2px;
+    }
+  }
+}
+
+.timeline-content-area {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+  padding-right: 8px;
+  padding-left: 4px;
+}
+
+.timeline-node {
+  position: absolute;
+  left: 4px;
+  right: 8px;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  background: #fff;
+  border: 1.5px solid var(--cat-color, #6b7280);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 0 0 3px color-mix(in srgb, var(--cat-color, #6b7280) 10%, transparent);
+  min-height: 44px;
+  z-index: 2;
+  cursor: grab;
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+  
+  &:before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--cat-color, #6b7280);
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 2px var(--cat-color, #6b7280);
+    z-index: 3;
+  }
+  
+  &:active {
+    cursor: grabbing;
+  }
+  
+  &.dragging {
+    z-index: 10;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), 0 0 0 4px color-mix(in srgb, var(--cat-color, #6b7280) 20%, transparent);
+    transform: scale(1.02);
+    opacity: 0.95;
+  }
+  
+  &.wake { --cat-color: #f59e0b; }
+  &.work { --cat-color: #3b82f6; }
+  &.sport { --cat-color: #10b981; }
+  &.rest { --cat-color: #8b5cf6; }
+  &.meal { --cat-color: #ef4444; }
+  &.other { --cat-color: #6b7280; }
+}
+
+.node-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--cat-color, #6b7280) 12%, transparent);
+  color: var(--cat-color, #6b7280);
+  cursor: grab;
+  border-right: 1px solid color-mix(in srgb, var(--cat-color, #6b7280) 15%, transparent);
+  border-radius: 8px 0 0 8px;
+  
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.node-info {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
+  justify-content: center;
+  gap: 1px;
+  cursor: pointer;
 }
 
-.item-row {
+.node-time {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cat-color, #6b7280);
+  line-height: 1.2;
+  letter-spacing: 0.2px;
+}
+
+.node-title {
+  font-size: 12px;
+  color: $text-primary;
+  font-weight: 500;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  
+  &.placeholder {
+    color: #9ca3af;
+    font-style: italic;
+    font-weight: 400;
+  }
+}
+
+.node-delete {
+  width: 24px;
+  flex-shrink: 0;
   display: flex;
-  gap: 8px;
   align-items: center;
+  justify-content: center;
+  color: #d1d5db;
+  cursor: pointer;
+  border-radius: 0 8px 8px 0;
+  transition: all 0.2s ease;
   
-  .time-input {
-    flex: 0 0 100px;
-  }
-  
-  .title-input {
-    flex: 1;
-  }
-  
-  .remove-btn {
+  &:hover, &:active {
+    background: #fef2f2;
     color: $danger-color;
-    padding: 8px;
+  }
+}
+
+.timeline-editor-footer {
+  padding: 12px 4px 0;
+}
+
+.title-editor-wrapper {
+  padding: 0;
+}
+
+.title-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid $border-color;
+  
+  .editor-cancel {
+    font-size: 14px;
+    color: $text-secondary;
+    cursor: pointer;
+  }
+  
+  .editor-title-label {
+    font-size: 16px;
+    font-weight: 600;
+    color: $text-primary;
+  }
+  
+  .editor-confirm {
+    font-size: 14px;
+    font-weight: 600;
+    color: $primary-color;
+    cursor: pointer;
+  }
+}
+
+.title-editor-body {
+  padding: 16px 20px 24px;
+}
+
+.title-editor-row {
+  margin-bottom: 12px;
+  
+  label {
+    display: block;
+    font-size: 12px;
+    color: $text-secondary;
+    margin-bottom: 6px;
+    padding: 0 4px;
+    font-weight: 500;
+  }
+  
+  :deep(.van-field) {
+    background: #f9fafb;
+    border-radius: 10px;
+  }
+}
+
+.title-editor-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed $border-color;
+}
+
+.category-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 12px;
+  border-radius: 20px;
+  background: #f9fafb;
+  border: 1.5px solid $border-color;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  .cat-icon {
+    font-size: 14px;
+    line-height: 1;
+  }
+  
+  .cat-label {
+    font-size: 12px;
+    color: $text-secondary;
+    font-weight: 500;
+  }
+  
+  &.active {
+    background: color-mix(in srgb, var(--cat-color, $primary-color) 12%, #fff);
+    border-color: var(--cat-color, $primary-color);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--cat-color, $primary-color) 10%, transparent);
+    
+    .cat-label {
+      color: var(--cat-color, $primary-color);
+      font-weight: 600;
+    }
   }
 }
 
