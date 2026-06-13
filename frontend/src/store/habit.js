@@ -1297,6 +1297,66 @@ export const useHabitStore = defineStore('habit', {
       }
     },
 
+    getArchivedHabitStats(habitId, archiveTime) {
+      const completedDates = []
+      const archiveDate = dayjs(archiveTime)
+      
+      Object.keys(this.checkins).forEach(date => {
+        if (this.checkins[date] && this.checkins[date][habitId] === true) {
+          if (dayjs(date).isBefore(archiveDate) || dayjs(date).isSame(archiveDate, 'day')) {
+            completedDates.push(date)
+          }
+        }
+      })
+      
+      completedDates.sort()
+      
+      const completedDays = completedDates.length
+      
+      if (completedDays === 0) {
+        return {
+          totalDays: 0,
+          completedDays: 0,
+          maxStreak: 0,
+          completionRate: 0,
+          firstDate: null,
+          lastDate: null,
+          activeDays: 0
+        }
+      }
+      
+      const firstDate = dayjs(completedDates[0])
+      const lastDate = dayjs(completedDates[completedDates.length - 1])
+      const totalDays = archiveDate.diff(firstDate, 'day') + 1
+      const activeDays = lastDate.diff(firstDate, 'day') + 1
+      
+      let maxStreak = 0
+      let streak = 1
+      maxStreak = 1
+      for (let i = 1; i < completedDates.length; i++) {
+        const prev = dayjs(completedDates[i - 1])
+        const curr = dayjs(completedDates[i])
+        if (curr.diff(prev, 'day') === 1) {
+          streak++
+          if (streak > maxStreak) {
+            maxStreak = streak
+          }
+        } else {
+          streak = 1
+        }
+      }
+      
+      return {
+        totalDays,
+        completedDays,
+        maxStreak,
+        completionRate: activeDays > 0 ? Math.round((completedDays / activeDays) * 100) : 0,
+        firstDate: firstDate.format('YYYY-MM-DD'),
+        lastDate: lastDate.format('YYYY-MM-DD'),
+        activeDays
+      }
+    },
+
     getHabitCheckinDetail(habitId, days = 30) {
       const detail = []
       const today = dayjs()
