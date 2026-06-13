@@ -1055,14 +1055,6 @@ export const useHabitStore = defineStore('habit', {
         this.starredOrder = this.starredOrder.filter(sid => sid !== id)
         this.nonStarredOrder = this.nonStarredOrder.filter(sid => sid !== id)
         
-        const newCheckins = {}
-        for (const date in this.checkins) {
-          const dateCheckins = { ...this.checkins[date] }
-          delete dateCheckins[id]
-          newCheckins[date] = dateCheckins
-        }
-        this.checkins = newCheckins
-        
         this.saveToCache()
       }
       
@@ -1125,6 +1117,9 @@ export const useHabitStore = defineStore('habit', {
               this.nonStarredOrder.push(id)
             }
           }
+          
+          await this.loadHabitCheckins(id)
+          
           this.saveToCache()
           return habit
         }
@@ -1138,11 +1133,35 @@ export const useHabitStore = defineStore('habit', {
       return null
     },
 
+    async loadHabitCheckins(habitId) {
+      try {
+        const res = await checkinApi.getByHabit(habitId)
+        if (res.code === 0 && res.data) {
+          res.data.forEach(item => {
+            const date = item.date
+            const completed = item.completed
+            if (!this.checkins[date]) {
+              this.checkins[date] = {}
+            }
+            if (completed) {
+              this.checkins[date][habitId] = true
+            }
+          })
+          this.saveToCache()
+        }
+      } catch (e) {
+        console.error('加载习惯打卡记录失败', e)
+      }
+    },
+
     async loadArchivedHabits() {
       try {
         const res = await habitApi.getArchivedList()
         if (res.code === 0 && res.data) {
           this.archivedHabits = res.data
+          for (const habit of res.data) {
+            await this.loadHabitCheckins(habit.id)
+          }
           this.saveToCache()
           return this.archivedHabits
         }

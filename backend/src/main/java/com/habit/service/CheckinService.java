@@ -91,6 +91,12 @@ public class CheckinService extends ServiceImpl<CheckinMapper, Checkin> {
         return checkins.size();
     }
     
+    public List<Checkin> getCheckinsByHabitId(Long habitId) {
+        return this.list(new LambdaQueryWrapper<Checkin>()
+                .eq(Checkin::getHabitId, habitId)
+                .orderByAsc(Checkin::getCheckinDate));
+    }
+
     private void clearDateCache(LocalDate date) {
         redisTemplate.delete(CHECKIN_CACHE_PREFIX + date);
     }

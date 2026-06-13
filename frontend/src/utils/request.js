@@ -42,6 +42,7 @@ export const habitApi = {
 
 export const checkinApi = {
   getByDate: (date) => request.get(`/checkins/${date}`),
+  getByHabit: (habitId) => request.get(`/checkins/habit/${habitId}`),
   toggle: (habitId, date) => request.post('/checkins', { habitId, date })
 }
 

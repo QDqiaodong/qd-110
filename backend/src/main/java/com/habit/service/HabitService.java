@@ -67,7 +67,6 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
             return null;
         }
         habit.setArchived(false);
-        habit.setArchiveTime(null);
         this.updateById(habit);
         clearCache();
         triggerMonthlyStatRecalc();

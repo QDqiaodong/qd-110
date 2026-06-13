@@ -154,12 +154,12 @@ const handleUnarchive = async (habit) => {
   try {
     await showConfirmDialog({
       title: '重新启用',
-      message: `确定要重新启用「${habit.name}」吗？`,
+      message: `确定要重新启用「${habit.name}」吗？\n历史打卡记录和归档轨迹将完整保留。`,
       confirmButtonColor: '#3b82f6'
     })
     const result = await store.unarchiveHabit(habit.id)
     if (result) {
-      showToast('已重新启用')
+      showToast('已重新启用，历史记录完整保留')
     }
   } catch (e) {}
 }

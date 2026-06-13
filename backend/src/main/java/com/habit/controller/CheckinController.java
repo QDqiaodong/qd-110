@@ -13,7 +13,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/checkins")
@@ -36,6 +38,20 @@ public class CheckinController {
         LocalDate checkinDate = LocalDate.parse(date);
         Map<Long, Boolean> checkins = checkinService.getCheckinsByDate(checkinDate);
         return Result.success(checkins);
+    }
+
+    @GetMapping("/habit/{habitId}")
+    public Result<List<Map<String, Object>>> getCheckinsByHabit(@PathVariable Long habitId) {
+        List<com.habit.entity.Checkin> checkins = checkinService.getCheckinsByHabitId(habitId);
+        List<Map<String, Object>> result = checkins.stream()
+                .map(c -> {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("date", c.getCheckinDate().toString());
+                    item.put("completed", c.getCompleted());
+                    return item;
+                })
+                .collect(Collectors.toList());
+        return Result.success(result);
     }
     
     @PostMapping
