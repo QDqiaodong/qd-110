@@ -19,6 +19,59 @@
       <van-icon name="arrow" />
     </div>
 
+    <div class="history-section">
+      <div class="history-header" @click="showHistory = !showHistory">
+        <div class="history-header-left">
+          <span class="history-icon">🕐</span>
+          <span class="history-title">启用历史</span>
+          <span class="history-count">{{ historyList.length }}条记录</span>
+        </div>
+        <van-icon :name="showHistory ? 'arrow-up' : 'arrow-down'" />
+      </div>
+
+      <div v-if="showHistory" class="history-timeline">
+        <div v-if="historyList.length === 0" class="history-empty">
+          暂无模板切换记录
+        </div>
+        <div
+          v-for="(item, idx) in historyList"
+          :key="idx"
+          class="history-item"
+          :class="{ active: item.isActive }"
+        >
+          <div class="history-dot-wrap">
+            <div class="history-dot" :class="{ active: item.isActive }"></div>
+            <div v-if="idx < historyList.length - 1" class="history-line"></div>
+          </div>
+          <div class="history-content">
+            <div class="history-template-name">
+              {{ item.templateName }}
+              <van-tag v-if="item.isActive" type="primary" round size="mini">使用中</van-tag>
+            </div>
+            <div class="history-meta">
+              <span class="meta-item">
+                <van-icon name="clock-o" size="12" />
+                {{ formatHistoryDate(item.startDate) }} 启用
+              </span>
+              <span v-if="item.endDate" class="meta-item">
+                → {{ formatHistoryDate(item.endDate) }} 结束
+              </span>
+            </div>
+            <div class="history-stats">
+              <span class="stat-badge duration">
+                <van-icon name="calendar-o" size="12" />
+                {{ item.durationText }}
+              </span>
+              <span class="stat-badge rate" :class="getRateClass(item.completionRate)">
+                <van-icon name="bar-chart-o" size="12" />
+                {{ item.completionRate }}%完成率
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="dual-view-header">
       <div class="day-type-badge weekday">
         <span class="badge-icon">📅</span>
@@ -366,10 +419,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useHabitStore } from '@/store/habit'
 import { showToast, showConfirmDialog } from 'vant'
+import dayjs from 'dayjs'
 
 const router = useRouter()
 const store = useHabitStore()
@@ -378,6 +432,7 @@ const showAdd = ref(false)
 const showDetail = ref(false)
 const showTimePicker = ref(false)
 const showConflictDialog = ref(false)
+const showHistory = ref(false)
 const editingType = ref('')
 const editingIdx = ref(-1)
 const pickedTime = ref('')
@@ -388,6 +443,19 @@ const conflicts = ref({
   unplaceableHabits: [],
   totalConflicts: 0
 })
+
+const historyList = computed(() => store.templateHistoryWithStats || [])
+
+const formatHistoryDate = (dateStr) => {
+  if (!dateStr) return ''
+  return dayjs(dateStr).format('MM/DD HH:mm')
+}
+
+const getRateClass = (rate) => {
+  if (rate >= 80) return 'rate-high'
+  if (rate >= 50) return 'rate-medium'
+  return 'rate-low'
+}
 
 const newTpl = ref({
   name: '',
@@ -564,6 +632,173 @@ const goToReview = () => {
 .review-desc {
   font-size: 12px;
   color: #b45309;
+}
+
+.history-section {
+  @include card;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.history-header {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+
+  &:active {
+    background: #f9fafb;
+  }
+}
+
+.history-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-icon {
+  font-size: 20px;
+}
+
+.history-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: $text-primary;
+}
+
+.history-count {
+  font-size: 11px;
+  color: $text-secondary;
+  background: #f3f4f6;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.history-timeline {
+  padding: 0 16px 16px;
+}
+
+.history-empty {
+  text-align: center;
+  padding: 24px;
+  font-size: 13px;
+  color: $text-secondary;
+  background: #f9fafb;
+  border-radius: 10px;
+}
+
+.history-item {
+  display: flex;
+  gap: 12px;
+  min-height: 80px;
+
+  &.active {
+    .history-content {
+      background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
+      border: 1px solid #bfdbfe;
+    }
+  }
+}
+
+.history-dot-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.history-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #d1d5db;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px #d1d5db;
+  flex-shrink: 0;
+  margin-top: 6px;
+
+  &.active {
+    background: $primary-color;
+    box-shadow: 0 0 0 2px $primary-color;
+  }
+}
+
+.history-line {
+  width: 2px;
+  flex: 1;
+  background: #e5e7eb;
+  margin: 4px 0;
+}
+
+.history-content {
+  flex: 1;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+
+.history-template-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: $text-primary;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: $text-secondary;
+}
+
+.history-stats {
+  display: flex;
+  gap: 8px;
+}
+
+.stat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+
+  &.duration {
+    background: #f3f4f6;
+    color: $text-secondary;
+  }
+
+  &.rate {
+    &.rate-high {
+      background: #ecfdf5;
+      color: #059669;
+    }
+    &.rate-medium {
+      background: #fffbeb;
+      color: #d97706;
+    }
+    &.rate-low {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+  }
 }
 
 .dual-view-header {

@@ -22,6 +22,7 @@ export const useHabitStore = defineStore('habit', {
     currentHabitMilestone: null,
     habitDetails: {},
     missReasonPresets: ['加班', '出门', '忘记', '状态差'],
+    templateHistory: [],
     templates: [
       { id: 1, name: '早起作息',
         weekdayItems: [
@@ -462,6 +463,38 @@ export const useHabitStore = defineStore('habit', {
         
         return timeSlots
       }
+    },
+    templateHistoryWithStats(state) {
+      const activeIds = state.habits.map(h => h.id)
+      return state.templateHistory.map(record => {
+        const start = dayjs(record.startDate)
+        const end = record.endDate ? dayjs(record.endDate) : dayjs()
+        const durationDays = end.diff(start, 'day') + 1
+        let completedCount = 0
+        let totalPossible = 0
+        for (let i = 0; i < durationDays; i++) {
+          const dateStr = start.add(i, 'day').format('YYYY-MM-DD')
+          const dayCheckins = state.checkins[dateStr] || {}
+          activeIds.forEach(id => {
+            totalPossible++
+            if (dayCheckins[id]) completedCount++
+          })
+        }
+        const completionRate = totalPossible > 0 ? Math.round((completedCount / totalPossible) * 100) : 0
+        let durationText = ''
+        if (durationDays >= 30) {
+          durationText = `${Math.floor(durationDays / 30)}个月${durationDays % 30 > 0 ? durationDays % 30 + '天' : ''}`
+        } else {
+          durationText = `${durationDays}天`
+        }
+        return {
+          ...record,
+          durationDays,
+          durationText,
+          completionRate,
+          isActive: !record.endDate
+        }
+      }).reverse()
     }
   },
 
@@ -480,6 +513,7 @@ export const useHabitStore = defineStore('habit', {
           this.currentSchedule = data.currentSchedule || this.templates[0]
           this.starredOrder = data.starredOrder || []
           this.nonStarredOrder = data.nonStarredOrder || []
+          this.templateHistory = data.templateHistory || []
         } else {
           this.initDefaultData()
         }
@@ -498,7 +532,8 @@ export const useHabitStore = defineStore('habit', {
           schedules: this.schedules,
           currentSchedule: this.currentSchedule,
           starredOrder: this.starredOrder,
-          nonStarredOrder: this.nonStarredOrder
+          nonStarredOrder: this.nonStarredOrder,
+          templateHistory: this.templateHistory
         }))
       } catch (e) {
         console.error('缓存保存失败', e)
@@ -531,6 +566,12 @@ export const useHabitStore = defineStore('habit', {
       this.starredOrder = [1, 4]
       this.nonStarredOrder = [2, 3]
       this.currentSchedule = this.templates[0]
+      this.templateHistory = [{
+        templateId: this.templates[0].id,
+        templateName: this.templates[0].name,
+        startDate: dayjs().format('YYYY-MM-DD HH:mm'),
+        endDate: null
+      }]
       this.habitsLoaded = true
       this.saveToCache()
     },
@@ -949,6 +990,19 @@ export const useHabitStore = defineStore('habit', {
     },
 
     setCurrentSchedule(schedule) {
+      const now = dayjs().format('YYYY-MM-DD HH:mm')
+      if (this.currentSchedule) {
+        const lastRecord = this.templateHistory[this.templateHistory.length - 1]
+        if (lastRecord && !lastRecord.endDate) {
+          lastRecord.endDate = now
+        }
+      }
+      this.templateHistory.push({
+        templateId: schedule.id,
+        templateName: schedule.name,
+        startDate: now,
+        endDate: null
+      })
       this.currentSchedule = schedule
       this.saveToCache()
     },
