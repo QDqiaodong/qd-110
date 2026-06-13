@@ -53,6 +53,47 @@
       </div>
     </div>
 
+    <div v-if="store.gapSuggestions.length > 0" class="gap-suggestions-section">
+      <div class="gap-suggestions-header">
+        <div class="gap-suggestions-title">
+          <span class="gap-icon">💡</span>
+          空档建议板
+        </div>
+        <div class="gap-suggestions-subtitle">发现零散时间 · 塞入轻量习惯</div>
+      </div>
+      <div class="gap-suggestions-list">
+        <div
+          v-for="suggestion in store.gapSuggestions"
+          :key="suggestion.id"
+          class="gap-suggestion-card"
+          :class="[`gap-type-${suggestion.type}`]"
+        >
+          <div class="gap-card-top">
+            <div class="gap-card-icon">{{ suggestion.icon }}</div>
+            <div class="gap-card-content">
+              <div class="gap-card-title">{{ suggestion.title }}</div>
+              <div class="gap-card-subtitle">{{ suggestion.subtitle }}</div>
+            </div>
+          </div>
+          <div v-if="suggestion.suggestedHabits && suggestion.suggestedHabits.length > 0" class="gap-habit-tags">
+            <div
+              v-for="habit in suggestion.suggestedHabits"
+              :key="habit.id"
+              class="gap-habit-tag"
+              :style="{ borderColor: habit.color, color: habit.color }"
+              @click="toggleCheckin(habit.id)"
+            >
+              <span class="gap-habit-icon" :style="{ background: habit.color + '20' }">
+                {{ getCategoryIcon(habit.category) }}
+              </span>
+              <span class="gap-habit-name">{{ habit.name }}</span>
+              <span v-if="habit.time" class="gap-habit-time">{{ habit.time }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="view-toggle">
       <van-radio-group v-model="viewMode" direction="horizontal" shape="round">
         <van-radio name="time">
@@ -1409,5 +1450,175 @@ const saveMissReasons = async () => {
 .modal-footer {
   padding: 16px 20px;
   border-top: 1px solid $border-color;
+}
+
+.gap-suggestions-section {
+  background: linear-gradient(135deg, #ecfeff 0%, #f0fdfa 50%, #eff6ff 100%);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid #a5f3fc;
+  box-shadow: 0 4px 16px rgba(6, 182, 212, 0.10);
+}
+
+.gap-suggestions-header {
+  margin-bottom: 12px;
+}
+
+.gap-suggestions-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #155e75;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  .gap-icon {
+    font-size: 20px;
+  }
+}
+
+.gap-suggestions-subtitle {
+  font-size: 12px;
+  color: #0e7490;
+  margin-top: 2px;
+}
+
+.gap-suggestions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gap-suggestion-card {
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 12px;
+  padding: 12px 14px;
+  border-left: 3px solid #06b6d4;
+  transition: all 0.2s;
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &.gap-type-time-gap {
+    border-left-color: #f59e0b;
+    background: linear-gradient(90deg, rgba(251, 191, 36, 0.06) 0%, rgba(255, 255, 255, 0.9) 100%);
+  }
+
+  &.gap-type-scene {
+    border-left-color: #8b5cf6;
+    background: linear-gradient(90deg, rgba(139, 92, 246, 0.06) 0%, rgba(255, 255, 255, 0.9) 100%);
+  }
+
+  &.gap-type-between-gap {
+    border-left-color: #10b981;
+    background: linear-gradient(90deg, rgba(16, 185, 129, 0.06) 0%, rgba(255, 255, 255, 0.9) 100%);
+  }
+
+  &.gap-type-light {
+    border-left-color: #06b6d4;
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0.06) 0%, rgba(255, 255, 255, 0.9) 100%);
+  }
+}
+
+.gap-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.gap-card-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  @include flex-center;
+  font-size: 18px;
+  flex-shrink: 0;
+  background: rgba(6, 182, 212, 0.12);
+}
+
+.gap-type-time-gap .gap-card-icon {
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.gap-type-scene .gap-card-icon {
+  background: rgba(139, 92, 246, 0.15);
+}
+
+.gap-type-between-gap .gap-card-icon {
+  background: rgba(16, 185, 129, 0.15);
+}
+
+.gap-type-light .gap-card-icon {
+  background: rgba(6, 182, 212, 0.15);
+}
+
+.gap-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.gap-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: $text-primary;
+  margin-bottom: 3px;
+  line-height: 1.4;
+}
+
+.gap-card-subtitle {
+  font-size: 11px;
+  color: $text-secondary;
+  line-height: 1.4;
+}
+
+.gap-habit-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.25);
+}
+
+.gap-habit-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 18px;
+  border: 1.5px solid;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:active {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+}
+
+.gap-habit-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  @include flex-center;
+  font-size: 11px;
+}
+
+.gap-habit-name {
+  white-space: nowrap;
+}
+
+.gap-habit-time {
+  font-size: 10px;
+  opacity: 0.7;
+  padding-left: 4px;
+  margin-left: 2px;
+  border-left: 1px solid currentColor;
+  opacity: 0.5;
 }
 </style>

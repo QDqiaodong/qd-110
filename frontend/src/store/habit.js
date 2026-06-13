@@ -14,7 +14,7 @@ export const useHabitStore = defineStore('habit', {
     currentSchedule: null,
     starredOrder: [],
     nonStarredOrder: [],
-    morningCards: [],
+    _morningCardsLegacy: [],
     habitsLoaded: false,
     _loadHabitsVersion: 0,
     _togglingHabits: new Set(),
@@ -495,6 +495,244 @@ export const useHabitStore = defineStore('habit', {
           isActive: !record.endDate
         }
       }).reverse()
+    },
+    timeToMinutes() {
+      return (timeStr) => {
+        if (!timeStr) return -1
+        const [h, m] = timeStr.split(':').map(Number)
+        return h * 60 + m
+      }
+    },
+    getUncompletedHabits(state) {
+      const today = dayjs().format('YYYY-MM-DD')
+      const todayCheckins = state.checkins[today] || {}
+      return state.habits.filter(h => !todayCheckins[h.id])
+    },
+    gapSuggestions(state) {
+      const now = dayjs()
+      const nowMinutes = now.hour() * 60 + now.minute()
+      const dayOfWeek = now.day()
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+      let todayItems = []
+      if (state.currentSchedule) {
+        const rawItems = isWeekend 
+          ? (state.currentSchedule.weekendItems || state.currentSchedule.items || [])
+          : (state.currentSchedule.weekdayItems || state.currentSchedule.items || [])
+        todayItems = [...rawItems].sort((a, b) => a.time.localeCompare(b.time))
+      }
+      const today = dayjs().format('YYYY-MM-DD')
+      const todayCheckins = state.checkins[today] || {}
+      const uncompletedHabits = state.habits.filter(h => !todayCheckins[h.id])
+      const suggestions = []
+
+      const timeToMin = (t) => {
+        const [h, m] = t.split(':').map(Number)
+        return h * 60 + m
+      }
+
+      const minToTime = (mins) => {
+        const h = Math.floor(mins / 60)
+        const m = mins % 60
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+      }
+
+      const formatGapMinutes = (mins) => {
+        if (mins >= 60) {
+          const h = Math.floor(mins / 60)
+          const m = mins % 60
+          return m > 0 ? `${h}小时${m}分钟` : `${h}小时`
+        }
+        return `${mins}分钟`
+      }
+
+      let nextScheduleItem = null
+      for (let i = 0; i < todayItems.length; i++) {
+        const itemMin = timeToMin(todayItems[i].time)
+        if (itemMin > nowMinutes) {
+          nextScheduleItem = { ...todayItems[i], minutes: itemMin }
+          break
+        }
+      }
+
+      if (nextScheduleItem) {
+        const gap = nextScheduleItem.minutes - nowMinutes
+        if (gap >= 5 && gap <= 120) {
+          const matchedHabits = uncompletedHabits.filter(h => {
+            if (!h.time) return true
+            const hMin = timeToMin(h.time)
+            return Math.abs(hMin - nowMinutes) <= 60 || Math.abs(hMin - nextScheduleItem.minutes) <= 60
+          })
+          const suggestedHabits = matchedHabits.length > 0 
+            ? matchedHabits.slice(0, 2) 
+            : uncompletedHabits.slice(0, 2)
+
+          const timeLabel = now.hour() < 12 ? '上午' : (now.hour() < 18 ? '下午' : '晚上')
+          suggestions.push({
+            id: 'immediate-gap',
+            type: 'time-gap',
+            icon: '⏱️',
+            title: `${timeLabel}${nextScheduleItem.time}前还有${formatGapMinutes(gap)}空档`,
+            subtitle: `下一项：${nextScheduleItem.title}`,
+            gapMinutes: gap,
+            suggestedHabits,
+            priority: 100 - Math.min(gap, 100)
+          })
+        }
+      }
+
+      const sceneMatchers = [
+        {
+          id: 'after-dinner',
+          keywords: ['晚餐', '晚饭', '吃饭'],
+          match: (item) => item.title.includes('晚餐') || item.title.includes('晚饭'),
+          sceneTitle: '晚饭后',
+          sceneIcon: '🌙',
+          preferredCategories: ['阅读', '学习', '生活'],
+          timeWindow: { start: 30, end: 120 }
+        },
+        {
+          id: 'after-lunch',
+          keywords: ['午餐', '午饭'],
+          match: (item) => item.title.includes('午餐') || item.title.includes('午饭'),
+          sceneTitle: '午饭后',
+          sceneIcon: '☀️',
+          preferredCategories: ['阅读', '生活', '健康'],
+          timeWindow: { start: 20, end: 90 }
+        },
+        {
+          id: 'after-breakfast',
+          keywords: ['早餐', '早饭'],
+          match: (item) => item.title.includes('早餐') || item.title.includes('早饭'),
+          sceneTitle: '早饭后',
+          sceneIcon: '🌅',
+          preferredCategories: ['学习', '阅读', '健康'],
+          timeWindow: { start: 20, end: 90 }
+        },
+        {
+          id: 'before-sleep',
+          keywords: ['睡觉', '入睡', '准备睡觉'],
+          match: (item) => item.title.includes('睡觉') || item.title.includes('入睡'),
+          sceneTitle: '睡前',
+          sceneIcon: '💤',
+          preferredCategories: ['阅读', '生活', '学习'],
+          timeWindow: { start: -60, end: 0 }
+        },
+        {
+          id: 'after-exercise',
+          keywords: ['运动', '锻炼', '训练', '晨练', '健身', '晨跑', '户外', '拉伸'],
+          match: (item) => {
+            const title = item.title
+            return title.includes('运动') || title.includes('锻炼') || title.includes('训练') 
+              || title.includes('晨练') || title.includes('健身') || title.includes('晨跑')
+              || title.includes('户外') || title.includes('拉伸')
+          },
+          sceneTitle: '运动后',
+          sceneIcon: '💪',
+          preferredCategories: ['健康', '生活'],
+          timeWindow: { start: 10, end: 60 }
+        }
+      ]
+
+      for (let i = 0; i < todayItems.length; i++) {
+        const currentItem = todayItems[i]
+        const currentItemMin = timeToMin(currentItem.time)
+        const nextItem = i < todayItems.length - 1 ? todayItems[i + 1] : null
+        const nextItemMin = nextItem ? timeToMin(nextItem.time) : 24 * 60
+
+        for (const matcher of sceneMatchers) {
+          if (matcher.match(currentItem)) {
+            const sceneStartMin = currentItemMin + matcher.timeWindow.start
+            const sceneEndMin = currentItemMin + matcher.timeWindow.end
+            const isInSceneWindow = nowMinutes >= sceneStartMin && nowMinutes <= sceneEndMin
+            const isUpcomingScene = nowMinutes < sceneStartMin && (sceneStartMin - nowMinutes) <= 180
+
+            if (isInSceneWindow || isUpcomingScene) {
+              const sceneHabits = uncompletedHabits.filter(h => {
+                if (matcher.preferredCategories.includes(h.category)) return true
+                if (!h.time) return true
+                const hMin = timeToMin(h.time)
+                return hMin >= sceneStartMin && hMin <= sceneEndMin
+              })
+
+              const preferredHabits = sceneHabits.filter(h => matcher.preferredCategories.includes(h.category))
+              const otherHabits = sceneHabits.filter(h => !matcher.preferredCategories.includes(h.category))
+              const sortedHabits = [...preferredHabits, ...otherHabits].slice(0, 3)
+
+              if (sortedHabits.length > 0) {
+                let sceneTitleText = `${matcher.sceneTitle}适合安排${sortedHabits[0].category}`
+                if (sortedHabits.length > 1) {
+                  sceneTitleText = `${matcher.sceneTitle}适合安排${sortedHabits[0].name}或${sortedHabits[1].category}`
+                }
+
+                suggestions.push({
+                  id: `scene-${matcher.id}-${i}`,
+                  type: 'scene',
+                  icon: matcher.sceneIcon,
+                  title: sceneTitleText,
+                  subtitle: isInSceneWindow 
+                    ? `现在正是好时机（${minToTime(sceneStartMin)} - ${minToTime(sceneEndMin)}）` 
+                    : `即将到来：${minToTime(sceneStartMin)} - ${minToTime(sceneEndMin)}`,
+                  anchorItem: currentItem.title,
+                  suggestedHabits: sortedHabits,
+                  priority: isInSceneWindow ? 90 : 50
+                })
+              }
+            }
+          }
+        }
+
+        if (nextItem) {
+          const betweenGap = nextItemMin - currentItemMin
+          if (betweenGap >= 45 && betweenGap <= 180) {
+            const gapHabits = uncompletedHabits.filter(h => {
+              if (!h.time) return true
+              const hMin = timeToMin(h.time)
+              return hMin >= currentItemMin && hMin <= nextItemMin
+            })
+
+            if (gapHabits.length > 0 && nowMinutes < nextItemMin && nowMinutes >= currentItemMin - 30) {
+              const remainingGap = nextItemMin - Math.max(nowMinutes, currentItemMin)
+              if (remainingGap >= 15) {
+                suggestions.push({
+                  id: `between-gap-${i}`,
+                  type: 'between-gap',
+                  icon: '🎯',
+                  title: `${currentItem.title}到${nextItem.title}之间有${formatGapMinutes(betweenGap)}可利用`,
+                  subtitle: `还剩约${formatGapMinutes(remainingGap)} · ${currentItem.time} - ${nextItem.time}`,
+                  gapMinutes: betweenGap,
+                  remainingMinutes: remainingGap,
+                  suggestedHabits: gapHabits.slice(0, 2),
+                  priority: 70 - Math.min(remainingGap, 60)
+                })
+              }
+            }
+          }
+        }
+      }
+
+      const habitWithoutTime = uncompletedHabits.filter(h => !h.time)
+      if (habitWithoutTime.length > 0 && now.hour() >= 10 && now.hour() <= 20) {
+        const lightHabits = habitWithoutTime.filter(h => {
+          const name = h.name
+          return name.includes('喝水') || name.includes('杯') || name.includes('分钟') 
+            || name.includes('伸展') || name.includes('深呼吸')
+        })
+        const displayHabits = lightHabits.length > 0 ? lightHabits.slice(0, 2) : habitWithoutTime.slice(0, 2)
+        if (displayHabits.length > 0) {
+          suggestions.push({
+            id: 'light-habits',
+            type: 'light',
+            icon: '✨',
+            title: `别忘了${displayHabits.map(h => h.name).join('、')}`,
+            subtitle: '零散时间插入轻量习惯',
+            suggestedHabits: displayHabits,
+            priority: 40
+          })
+        }
+      }
+
+      suggestions.sort((a, b) => (b.priority || 0) - (a.priority || 0))
+      return suggestions.slice(0, 3)
     }
   },
 
