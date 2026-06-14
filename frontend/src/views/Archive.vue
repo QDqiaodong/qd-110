@@ -163,14 +163,17 @@ const initData = async () => {
     store.loadHabits(),
     store.loadArchivedHabits()
   ])
-  refreshStatsCache()
+  await refreshStatsCache()
 }
 
-const refreshStatsCache = () => {
+const refreshStatsCache = async () => {
   statsCache.value = {}
-  store.archivedHabits.forEach(habit => {
-    statsCache.value[habit.id] = store.getArchivedHabitStats(habit.id, habit.archiveTime)
+  const promises = store.archivedHabits.map(async (habit) => {
+    const stats = await store.fetchArchivedHabitStats(habit.id, habit.archiveTime, true)
+    statsCache.value[habit.id] = stats
+    return stats
   })
+  await Promise.all(promises)
 }
 
 const getCategoryIcon = (category) => {
@@ -254,7 +257,7 @@ const handleUnarchive = async (habit) => {
     const result = await store.unarchiveHabit(habit.id)
     if (result) {
       showToast('已重新启用，历史记录完整保留')
-      refreshStatsCache()
+      await refreshStatsCache()
     }
   } catch (e) {}
 }
@@ -269,7 +272,7 @@ const handleDelete = async (habit) => {
     const result = await store.deleteHabit(habit.id)
     if (result) {
       showToast('已删除')
-      refreshStatsCache()
+      await refreshStatsCache()
     }
   } catch (e) {}
 }

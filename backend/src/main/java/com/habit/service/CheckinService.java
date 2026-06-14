@@ -18,18 +18,21 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 public class CheckinService extends ServiceImpl<CheckinMapper, Checkin> {
-    
+
     private static final String CHECKIN_CACHE_PREFIX = "checkin:";
     private static final long CACHE_EXPIRE_HOURS = 24;
-    
+
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
-    
+
     @Autowired
     private CheckinMapper checkinMapper;
-    
+
     @Autowired
     private ApplicationEventPublisher eventPublisher;
+
+    @Autowired
+    private StreakCalculatorService streakCalculatorService;
     
     @SuppressWarnings("unchecked")
     public Map<Long, Boolean> getCheckinsByDate(LocalDate date) {
@@ -69,6 +72,7 @@ public class CheckinService extends ServiceImpl<CheckinMapper, Checkin> {
         }
         
         clearDateCache(date);
+        streakCalculatorService.clearStreakCache(habitId);
         eventPublisher.publishEvent(new CheckinChangedEvent(
             this, date, CheckinChangedEvent.ChangeType.CHECKIN_TOGGLE));
         return existing;
@@ -82,12 +86,13 @@ public class CheckinService extends ServiceImpl<CheckinMapper, Checkin> {
     public int softDeleteByHabitId(Long habitId) {
         List<Checkin> checkins = this.list(new LambdaQueryWrapper<Checkin>()
                 .eq(Checkin::getHabitId, habitId));
-        
+
         for (Checkin checkin : checkins) {
             clearDateCache(checkin.getCheckinDate());
             this.removeById(checkin.getId());
         }
-        
+
+        streakCalculatorService.clearStreakCache(habitId);
         return checkins.size();
     }
     

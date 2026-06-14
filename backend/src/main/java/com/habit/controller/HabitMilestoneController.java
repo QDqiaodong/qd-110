@@ -1,12 +1,14 @@
 package com.habit.controller;
 
 import com.habit.dto.Result;
+import com.habit.dto.StreakResult;
 import com.habit.entity.Checkin;
 import com.habit.entity.Habit;
 import com.habit.entity.HabitMilestone;
 import com.habit.service.CheckinService;
 import com.habit.service.HabitMilestoneService;
 import com.habit.service.HabitService;
+import com.habit.service.StreakCalculatorService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -22,12 +24,15 @@ public class HabitMilestoneController {
     
     @Autowired
     private HabitMilestoneService habitMilestoneService;
-    
+
     @Autowired
     private HabitService habitService;
-    
+
     @Autowired
     private CheckinService checkinService;
+
+    @Autowired
+    private StreakCalculatorService streakCalculatorService;
     
     @GetMapping("/habit/{habitId}")
     public Result<Map<String, Object>> getHabitMilestones(@PathVariable Long habitId) {
@@ -82,78 +87,31 @@ public class HabitMilestoneController {
     }
     
     private Map<String, Object> calculateHabitStats(Long habitId) {
-        List<Checkin> completedCheckins = checkinService.list(
-                new LambdaQueryWrapper<Checkin>()
-                        .eq(Checkin::getHabitId, habitId)
-                        .eq(Checkin::getCompleted, true)
-                        .orderByAsc(Checkin::getCheckinDate)
-        );
-        
-        int totalCompleted = completedCheckins.size();
-        
+        StreakResult streak = streakCalculatorService.calculateForHabit(habitId);
+
         Map<String, Object> stats = new HashMap<>();
+        int totalCompleted = streak.getTotalCompletedDays() != null ? streak.getTotalCompletedDays() : 0;
         stats.put("totalCompleted", totalCompleted);
-        
-        if (totalCompleted == 0) {
-            stats.put("currentStreak", 0);
-            stats.put("maxStreak", 0);
-            stats.put("firstCheckinDate", null);
-            stats.put("daysSinceFirst", 0);
-            stats.put("completionRate", 0);
-            return stats;
+        stats.put("currentStreak", streak.getCurrentStreak() != null ? streak.getCurrentStreak() : 0);
+        stats.put("maxStreak", streak.getMaxStreak() != null ? streak.getMaxStreak() : 0);
+        stats.put("firstCheckinDate", streak.getFirstCheckinDate() != null ? streak.getFirstCheckinDate().toString() : null);
+        stats.put("lastCheckinDate", streak.getLastCheckinDate() != null ? streak.getLastCheckinDate().toString() : null);
+
+        long daysSinceFirst = 0;
+        int completionRate = 0;
+        if (streak.getFirstCheckinDate() != null) {
+            LocalDate today = LocalDate.now();
+            daysSinceFirst = ChronoUnit.DAYS.between(streak.getFirstCheckinDate(), today) + 1;
+            completionRate = daysSinceFirst > 0 ? Math.round((totalCompleted * 100.0f) / daysSinceFirst) : 0;
         }
-        
-        List<LocalDate> completedDates = completedCheckins.stream()
-                .map(Checkin::getCheckinDate)
-                .sorted()
-                .collect(Collectors.toList());
-        
-        LocalDate firstDate = completedDates.get(0);
-        LocalDate today = LocalDate.now();
-        long daysSinceFirst = ChronoUnit.DAYS.between(firstDate, today) + 1;
-        
-        int currentStreak = 0;
-        int maxStreak = 0;
-        int tempStreak = 0;
-        
-        LocalDate prevDate = null;
-        for (LocalDate date : completedDates) {
-            if (prevDate == null) {
-                tempStreak = 1;
-            } else if (ChronoUnit.DAYS.between(prevDate, date) == 1) {
-                tempStreak++;
-            } else {
-                tempStreak = 1;
-            }
-            maxStreak = Math.max(maxStreak, tempStreak);
-            prevDate = date;
-        }
-        
-        if (completedDates.contains(today)) {
-            currentStreak = 1;
-            LocalDate d = today.minusDays(1);
-            while (completedDates.contains(d)) {
-                currentStreak++;
-                d = d.minusDays(1);
-            }
-        } else if (completedDates.contains(today.minusDays(1))) {
-            currentStreak = 1;
-            LocalDate d = today.minusDays(2);
-            while (completedDates.contains(d)) {
-                currentStreak++;
-                d = d.minusDays(1);
-            }
-        }
-        
-        int completionRate = daysSinceFirst > 0 ? 
-                Math.round((totalCompleted * 100.0f) / daysSinceFirst) : 0;
-        
-        stats.put("currentStreak", currentStreak);
-        stats.put("maxStreak", maxStreak);
-        stats.put("firstCheckinDate", firstDate.toString());
         stats.put("daysSinceFirst", daysSinceFirst);
         stats.put("completionRate", completionRate);
-        
+
+        stats.put("segments", streak.getSegments());
+        stats.put("breakPoints", streak.getBreakPoints());
+        stats.put("totalSegments", streak.getTotalSegments());
+        stats.put("totalBreakPoints", streak.getTotalBreakPoints());
+
         return stats;
     }
     

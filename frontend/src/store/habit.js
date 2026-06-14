@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import dayjs from 'dayjs'
-import { habitApi, checkinApi, milestoneApi } from '@/utils/request'
+import { habitApi, checkinApi, milestoneApi, streakApi } from '@/utils/request'
 
 const CACHE_KEY = 'habit_assistant_cache'
 
@@ -21,6 +21,8 @@ export const useHabitStore = defineStore('habit', {
     showHabitMilestoneModal: false,
     currentHabitMilestone: null,
     habitDetails: {},
+    streakCache: {},
+    archivedStreakCache: {},
     missReasonPresets: ['加班', '出门', '忘记', '状态差'],
     templateHistory: [],
     templates: [
@@ -1220,10 +1222,12 @@ export const useHabitStore = defineStore('habit', {
           }
           this.saveToCache()
           finalCompleted = oldValue
+        } else {
+          this.clearStreakCache(habitId)
         }
         this._togglingHabits.delete(`${habitId}_${targetDate}`)
       }
-      
+
       return { completed: finalCompleted, milestoneInfo, habitMilestoneInfo }
     },
 
@@ -1464,134 +1468,136 @@ export const useHabitStore = defineStore('habit', {
     },
 
     getHabitCheckinStats(habitId) {
-      const completedDates = []
-      
-      Object.keys(this.checkins).forEach(date => {
-        if (this.checkins[date] && this.checkins[date][habitId] === true) {
-          completedDates.push(date)
-        }
-      })
-      
-      completedDates.sort()
-      
-      const completedDays = completedDates.length
-      
-      if (completedDays === 0) {
-        return {
-          totalDays: 0,
-          completedDays: 0,
-          currentStreak: 0,
-          maxStreak: 0,
-          completionRate: 0
-        }
+      if (this.streakCache[habitId]) {
+        return this.streakCache[habitId]
       }
-      
-      const firstDate = dayjs(completedDates[0])
-      const today = dayjs()
-      const totalDays = today.diff(firstDate, 'day') + 1
-      
-      let maxStreak = 0
-      let currentStreak = 0
-      
-      let streak = 1
-      maxStreak = 1
-      for (let i = 1; i < completedDates.length; i++) {
-        const prev = dayjs(completedDates[i - 1])
-        const curr = dayjs(completedDates[i])
-        if (curr.diff(prev, 'day') === 1) {
-          streak++
-          if (streak > maxStreak) {
-            maxStreak = streak
-          }
-        } else {
-          streak = 1
-        }
-      }
-      
-      const todayStr = today.format('YYYY-MM-DD')
-      const yesterdayStr = today.subtract(1, 'day').format('YYYY-MM-DD')
-      if (completedDates.includes(todayStr)) {
-        currentStreak = 1
-        let d = today.subtract(1, 'day')
-        while (completedDates.includes(d.format('YYYY-MM-DD'))) {
-          currentStreak++
-          d = d.subtract(1, 'day')
-        }
-      } else if (completedDates.includes(yesterdayStr)) {
-        currentStreak = 1
-        let d = today.subtract(2, 'day')
-        while (completedDates.includes(d.format('YYYY-MM-DD'))) {
-          currentStreak++
-          d = d.subtract(1, 'day')
-        }
-      }
-      
       return {
-        totalDays,
-        completedDays,
-        currentStreak,
-        maxStreak,
-        completionRate: totalDays > 0 ? Math.round((completedDays / totalDays) * 100) : 0
+        totalDays: 0,
+        completedDays: 0,
+        currentStreak: 0,
+        maxStreak: 0,
+        completionRate: 0
+      }
+    },
+
+    async fetchHabitStats(habitId, force = false) {
+      if (!force && this.streakCache[habitId]) {
+        return this.streakCache[habitId]
+      }
+      try {
+        const res = await streakApi.getByHabit(habitId)
+        if (res.code === 0 && res.data) {
+          const s = res.data
+          const totalCompleted = s.totalCompletedDays || 0
+          let totalDays = 0
+          if (s.firstCheckinDate) {
+            totalDays = dayjs().diff(dayjs(s.firstCheckinDate), 'day') + 1
+          }
+          const stats = {
+            totalDays,
+            completedDays: totalCompleted,
+            currentStreak: s.currentStreak || 0,
+            maxStreak: s.maxStreak || 0,
+            completionRate: totalDays > 0 ? Math.round((totalCompleted / totalDays) * 100) : 0,
+            firstCheckinDate: s.firstCheckinDate,
+            lastCheckinDate: s.lastCheckinDate,
+            currentStreakStartDate: s.currentStreakStartDate,
+            currentStreakEndDate: s.currentStreakEndDate,
+            maxStreakStartDate: s.maxStreakStartDate,
+            maxStreakEndDate: s.maxStreakEndDate,
+            segments: s.segments || [],
+            breakPoints: s.breakPoints || [],
+            totalSegments: s.totalSegments || 0,
+            totalBreakPoints: s.totalBreakPoints || 0
+          }
+          this.streakCache[habitId] = stats
+          return stats
+        }
+      } catch (e) {
+        console.error('加载习惯统计失败', e)
+      }
+      return {
+        totalDays: 0,
+        completedDays: 0,
+        currentStreak: 0,
+        maxStreak: 0,
+        completionRate: 0
       }
     },
 
     getArchivedHabitStats(habitId, archiveTime) {
-      const completedDates = []
-      const archiveDate = dayjs(archiveTime)
-      
-      Object.keys(this.checkins).forEach(date => {
-        if (this.checkins[date] && this.checkins[date][habitId] === true) {
-          if (dayjs(date).isBefore(archiveDate) || dayjs(date).isSame(archiveDate, 'day')) {
-            completedDates.push(date)
-          }
-        }
-      })
-      
-      completedDates.sort()
-      
-      const completedDays = completedDates.length
-      
-      if (completedDays === 0) {
-        return {
-          totalDays: 0,
-          completedDays: 0,
-          maxStreak: 0,
-          completionRate: 0,
-          firstDate: null,
-          lastDate: null,
-          activeDays: 0
-        }
+      if (this.archivedStreakCache[habitId]) {
+        return this.archivedStreakCache[habitId]
       }
-      
-      const firstDate = dayjs(completedDates[0])
-      const lastDate = dayjs(completedDates[completedDates.length - 1])
-      const totalDays = archiveDate.diff(firstDate, 'day') + 1
-      const activeDays = lastDate.diff(firstDate, 'day') + 1
-      
-      let maxStreak = 0
-      let streak = 1
-      maxStreak = 1
-      for (let i = 1; i < completedDates.length; i++) {
-        const prev = dayjs(completedDates[i - 1])
-        const curr = dayjs(completedDates[i])
-        if (curr.diff(prev, 'day') === 1) {
-          streak++
-          if (streak > maxStreak) {
-            maxStreak = streak
-          }
-        } else {
-          streak = 1
-        }
-      }
-      
       return {
-        totalDays,
-        completedDays,
-        maxStreak,
-        completionRate: activeDays > 0 ? Math.round((completedDays / activeDays) * 100) : 0,
-        firstDate: firstDate.format('YYYY-MM-DD'),
-        lastDate: lastDate.format('YYYY-MM-DD'),
-        activeDays
+        totalDays: 0,
+        completedDays: 0,
+        maxStreak: 0,
+        completionRate: 0,
+        firstDate: null,
+        lastDate: null,
+        activeDays: 0
+      }
+    },
+
+    async fetchArchivedHabitStats(habitId, archiveTime, force = false) {
+      const cacheKey = habitId
+      if (!force && this.archivedStreakCache[cacheKey]) {
+        return this.archivedStreakCache[cacheKey]
+      }
+      try {
+        const archiveDateStr = dayjs(archiveTime).format('YYYY-MM-DD')
+        const res = await streakApi.getArchived(habitId, archiveDateStr)
+        if (res.code === 0 && res.data) {
+          const s = res.data
+          const totalCompleted = s.totalCompletedDays || 0
+          let totalDays = 0
+          let activeDays = 0
+          let firstDate = null
+          let lastDate = null
+          if (s.firstCheckinDate) {
+            firstDate = s.firstCheckinDate
+            totalDays = dayjs(archiveTime).diff(dayjs(s.firstCheckinDate), 'day') + 1
+          }
+          if (s.lastCheckinDate) {
+            lastDate = s.lastCheckinDate
+            activeDays = dayjs(s.lastCheckinDate).diff(dayjs(s.firstCheckinDate), 'day') + 1
+          }
+          const stats = {
+            totalDays,
+            completedDays: totalCompleted,
+            maxStreak: s.maxStreak || 0,
+            completionRate: activeDays > 0 ? Math.round((totalCompleted / activeDays) * 100) : 0,
+            firstDate,
+            lastDate,
+            activeDays,
+            segments: s.segments || [],
+            breakPoints: s.breakPoints || []
+          }
+          this.archivedStreakCache[cacheKey] = stats
+          return stats
+        }
+      } catch (e) {
+        console.error('加载归档习惯统计失败', e)
+      }
+      return {
+        totalDays: 0,
+        completedDays: 0,
+        maxStreak: 0,
+        completionRate: 0,
+        firstDate: null,
+        lastDate: null,
+        activeDays: 0
+      }
+    },
+
+    clearStreakCache(habitId) {
+      if (habitId) {
+        delete this.streakCache[habitId]
+        delete this.archivedStreakCache[habitId]
+      } else {
+        this.streakCache = {}
+        this.archivedStreakCache = {}
       }
     },
 

@@ -78,4 +78,13 @@ export const milestoneApi = {
   getDefinitions: () => request.get('/habit-milestones/definitions')
 }
 
+export const streakApi = {
+  getByHabit: (habitId, params) => request.get(`/streaks/habit/${habitId}`, { params }),
+  getArchived: (habitId, archiveDate) => request.get(`/streaks/habit/${habitId}/archived`, { params: { archiveDate } }),
+  getByRange: (habitId, rangeStart, rangeEnd) => request.get(`/streaks/habit/${habitId}/range`, { params: { rangeStart, rangeEnd } }),
+  getBatch: (habitIds) => request.post('/streaks/batch', habitIds),
+  clearCache: (habitId) => request.post(`/streaks/clear/${habitId}`),
+  clearAllCache: () => request.post('/streaks/clear-all')
+}
+
 export default request

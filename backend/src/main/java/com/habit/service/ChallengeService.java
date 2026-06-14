@@ -3,6 +3,7 @@ package com.habit.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.habit.dto.ChallengeDTO;
+import com.habit.dto.StreakResult;
 import com.habit.entity.Challenge;
 import com.habit.entity.Checkin;
 import com.habit.entity.Habit;
@@ -13,8 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -24,9 +23,12 @@ public class ChallengeService extends ServiceImpl<ChallengeMapper, Challenge> {
     
     @Autowired
     private HabitService habitService;
-    
+
     @Autowired
     private CheckinService checkinService;
+
+    @Autowired
+    private StreakCalculatorService streakCalculatorService;
     
     public Challenge getActiveChallenge(Long habitId) {
         return this.getOne(new LambdaQueryWrapper<Challenge>()
@@ -99,10 +101,10 @@ public class ChallengeService extends ServiceImpl<ChallengeMapper, Challenge> {
         if (challenge == null || !"active".equals(challenge.getStatus())) {
             return;
         }
-        
+
         LocalDate startDate = challenge.getStartDate();
         LocalDate today = LocalDate.now();
-        
+
         List<Checkin> checkins = checkinService.list(
             new LambdaQueryWrapper<Checkin>()
                 .eq(Checkin::getHabitId, challenge.getHabitId())
@@ -111,37 +113,19 @@ public class ChallengeService extends ServiceImpl<ChallengeMapper, Challenge> {
                 .eq(Checkin::getCompleted, true)
                 .orderByAsc(Checkin::getCheckinDate)
         );
-        
-        Map<LocalDate, Boolean> checkinMap = checkins.stream()
-                .collect(Collectors.toMap(Checkin::getCheckinDate, c -> true));
-        
+
         int completedDays = checkins.size();
-        
-        int currentStreak = 0;
-        int maxStreak = 0;
-        int tempStreak = 0;
-        
-        LocalDate date = startDate;
-        List<LocalDate> sortedDates = new ArrayList<>(checkinMap.keySet());
-        sortedDates.sort(Comparator.naturalOrder());
-        
-        for (LocalDate d = startDate; !d.isAfter(today); d = d.plusDays(1)) {
-            if (checkinMap.containsKey(d)) {
-                tempStreak++;
-                if (tempStreak > maxStreak) {
-                    maxStreak = tempStreak;
-                }
-            } else {
-                tempStreak = 0;
-            }
-        }
-        
-        currentStreak = tempStreak;
-        
+
+        StreakResult streak = streakCalculatorService.calculateForRange(
+                challenge.getHabitId(), startDate, today.plusDays(1));
+
+        int currentStreak = streak.getCurrentStreak() != null ? streak.getCurrentStreak() : 0;
+        int maxStreak = streak.getMaxStreak() != null ? streak.getMaxStreak() : 0;
+
         challenge.setCompletedDays(completedDays);
         challenge.setCurrentStreak(currentStreak);
-        challenge.setMaxStreak(Math.max(maxStreak, challenge.getMaxStreak()));
-        
+        challenge.setMaxStreak(Math.max(maxStreak, challenge.getMaxStreak() != null ? challenge.getMaxStreak() : 0));
+
         if (completedDays >= 7 && !challenge.getMilestone7()) {
             challenge.setMilestone7(true);
         }
@@ -151,11 +135,11 @@ public class ChallengeService extends ServiceImpl<ChallengeMapper, Challenge> {
         if (completedDays >= 21 && !challenge.getMilestone21()) {
             challenge.setMilestone21(true);
         }
-        
+
         if (!today.isBefore(challenge.getEndDate()) && completedDays >= challenge.getTotalDays()) {
             challenge.setStatus("completed");
         }
-        
+
         this.updateById(challenge);
     }
     
