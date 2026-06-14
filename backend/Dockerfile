@@ -1,6 +1,6 @@
 ARG DOCKER_REGISTRY=docker.m.daocloud.io/library/
 
-FROM ${DOCKER_REGISTRY}maven:3.9-eclipse-temurin-17 AS builder
+FROM ${DOCKER_REGISTRY}maven:3.9-eclipse-temurin-21 AS builder
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ COPY src ./src
 RUN mvn clean package -B -Dmaven.test.skip=true && \
     rm -rf /root/.m2/repository
 
-FROM ${DOCKER_REGISTRY}eclipse-temurin:17-jre
+FROM ${DOCKER_REGISTRY}eclipse-temurin:21-jre
 
 WORKDIR /app
 

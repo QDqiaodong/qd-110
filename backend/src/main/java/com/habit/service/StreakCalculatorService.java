@@ -5,6 +5,7 @@ import com.habit.dto.StreakBreakPoint;
 import com.habit.dto.StreakResult;
 import com.habit.dto.StreakSegment;
 import com.habit.entity.Checkin;
+import com.habit.mapper.CheckinMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.SerializationException;
@@ -23,7 +24,7 @@ public class StreakCalculatorService {
     private static final long CACHE_EXPIRE_MINUTES = 60;
 
     @Autowired
-    private CheckinService checkinService;
+    private CheckinMapper checkinMapper;
 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
@@ -78,7 +79,7 @@ public class StreakCalculatorService {
     }
 
     public int calculateCurrentStreakFast(Long habitId, LocalDate asOfDate) {
-        List<Checkin> checkins = checkinService.list(
+        List<Checkin> checkins = checkinMapper.selectList(
                 new LambdaQueryWrapper<Checkin>()
                         .eq(Checkin::getHabitId, habitId)
                         .eq(Checkin::getCompleted, true)
@@ -248,7 +249,7 @@ public class StreakCalculatorService {
             wrapper.lt(Checkin::getCheckinDate, endDate);
         }
 
-        return checkinService.list(wrapper);
+        return checkinMapper.selectList(wrapper);
     }
 
     private StreakResult emptyResult(Long habitId) {
