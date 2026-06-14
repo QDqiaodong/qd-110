@@ -106,8 +106,46 @@ CREATE TABLE IF NOT EXISTS monthly_stat (
     INDEX idx_stat_month (stat_month)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='月度统计表';
 
+CREATE TABLE IF NOT EXISTS habit_gap_rule (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    habit_id BIGINT NOT NULL COMMENT '习惯ID',
+    time_slot VARCHAR(20) DEFAULT '全天' COMMENT '检测时段：早晨/上午/中午/下午/傍晚/晚上/凌晨/全天',
+    gap_days INT DEFAULT 3 COMMENT '空窗天数阈值',
+    enabled TINYINT(1) DEFAULT 1 COMMENT '是否启用',
+    high_risk TINYINT(1) DEFAULT 0 COMMENT '是否高风险',
+    current_gap_days INT DEFAULT 0 COMMENT '当前连续空窗天数',
+    missed_time_slot_stats TEXT COMMENT '漏做时段统计JSON',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted INT DEFAULT 0 COMMENT '逻辑删除标记',
+    INDEX idx_habit_id (habit_id),
+    INDEX idx_high_risk (high_risk),
+    INDEX idx_enabled (enabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='习惯打卡空窗提醒规则';
+
+CREATE TABLE IF NOT EXISTS quiet_hour_rule (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    name VARCHAR(100) NOT NULL COMMENT '规则名称',
+    start_time VARCHAR(10) NOT NULL COMMENT '开始时间 HH:mm',
+    end_time VARCHAR(10) NOT NULL COMMENT '结束时间 HH:mm',
+    enabled TINYINT(1) DEFAULT 1 COMMENT '是否启用',
+    category VARCHAR(50) DEFAULT '自定义' COMMENT '分类：作息/专注/自定义',
+    sort_order INT DEFAULT 0 COMMENT '排序号',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted INT DEFAULT 0 COMMENT '逻辑删除标记',
+    INDEX idx_enabled (enabled),
+    INDEX idx_category (category)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='安静时段规则表';
+
 INSERT INTO habit (name, category, time, remind, color, starred, sort_order) VALUES
 ('早起', '作息', '07:00', 1, '#3b82f6', 1, 1),
 ('阅读30分钟', '学习', '20:00', 1, '#10b981', 0, 1),
 ('运动锻炼', '健康', '18:00', 0, '#f59e0b', 0, 2),
 ('喝8杯水', '健康', NULL, 0, '#06b6d4', 1, 2);
+
+INSERT INTO quiet_hour_rule (name, start_time, end_time, enabled, category, sort_order) VALUES
+('午休时段', '12:30', '14:00', 1, '作息', 1),
+('深夜勿扰', '23:00', '06:00', 1, '作息', 2),
+('深度工作', '09:30', '11:30', 0, '专注', 3),
+('下午专注', '15:00', '17:00', 0, '专注', 4);

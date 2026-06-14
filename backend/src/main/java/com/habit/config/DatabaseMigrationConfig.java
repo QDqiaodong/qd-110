@@ -22,6 +22,7 @@ public class DatabaseMigrationConfig {
             
             migrateHabitTable();
             migrateHabitGapRuleTable();
+            migrateQuietHourRuleTable();
             
             log.info("数据库迁移检查完成");
         } catch (Exception e) {
@@ -163,6 +164,73 @@ public class DatabaseMigrationConfig {
             addIndexIfNotExists(databaseName, "habit_gap_rule", "idx_habit_id", "idx_habit_id (habit_id)");
             addIndexIfNotExists(databaseName, "habit_gap_rule", "idx_high_risk", "idx_high_risk (high_risk)");
             addIndexIfNotExists(databaseName, "habit_gap_rule", "idx_enabled", "idx_enabled (enabled)");
+        }
+    }
+
+    private void migrateQuietHourRuleTable() {
+        String databaseName = jdbcTemplate.queryForObject(
+            "SELECT DATABASE()", String.class);
+        
+        if (databaseName == null) {
+            log.warn("未获取到当前数据库名，跳过quiet_hour_rule表迁移");
+            return;
+        }
+
+        String tableCheckSql = "SELECT COUNT(*) FROM information_schema.TABLES " +
+            "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'quiet_hour_rule'";
+        
+        Integer tableCount = jdbcTemplate.queryForObject(tableCheckSql, Integer.class, databaseName, "quiet_hour_rule");
+        
+        if (tableCount == null || tableCount == 0) {
+            String createTableSql = "CREATE TABLE quiet_hour_rule (" +
+                "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID'," +
+                "name VARCHAR(100) NOT NULL COMMENT '规则名称'," +
+                "start_time VARCHAR(10) NOT NULL COMMENT '开始时间 HH:mm'," +
+                "end_time VARCHAR(10) NOT NULL COMMENT '结束时间 HH:mm'," +
+                "enabled TINYINT(1) DEFAULT 1 COMMENT '是否启用'," +
+                "category VARCHAR(50) DEFAULT '自定义' COMMENT '分类：作息/专注/自定义'," +
+                "sort_order INT DEFAULT 0 COMMENT '排序号'," +
+                "create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'," +
+                "update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'," +
+                "deleted INT DEFAULT 0 COMMENT '逻辑删除标记'," +
+                "INDEX idx_enabled (enabled)," +
+                "INDEX idx_category (category)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='安静时段规则表'";
+            
+            jdbcTemplate.execute(createTableSql);
+            log.info("创建表成功: quiet_hour_rule");
+
+            String insertDefaultsSql = "INSERT INTO quiet_hour_rule (name, start_time, end_time, enabled, category, sort_order) VALUES " +
+                "('午休时段', '12:30', '14:00', 1, '作息', 1)," +
+                "('深夜勿扰', '23:00', '06:00', 1, '作息', 2)," +
+                "('深度工作', '09:30', '11:30', 0, '专注', 3)," +
+                "('下午专注', '15:00', '17:00', 0, '专注', 4)";
+            jdbcTemplate.execute(insertDefaultsSql);
+            log.info("初始化默认安静时段规则成功");
+        } else {
+            log.debug("表已存在: quiet_hour_rule");
+            
+            addColumnIfNotExists(databaseName, "quiet_hour_rule", "name", 
+                "VARCHAR(100) NOT NULL COMMENT '规则名称'");
+            addColumnIfNotExists(databaseName, "quiet_hour_rule", "start_time", 
+                "VARCHAR(10) NOT NULL COMMENT '开始时间 HH:mm'");
+            addColumnIfNotExists(databaseName, "quiet_hour_rule", "end_time", 
+                "VARCHAR(10) NOT NULL COMMENT '结束时间 HH:mm'");
+            addColumnIfNotExists(databaseName, "quiet_hour_rule", "enabled", 
+                "TINYINT(1) DEFAULT 1 COMMENT '是否启用'");
+            addColumnIfNotExists(databaseName, "quiet_hour_rule", "category", 
+                "VARCHAR(50) DEFAULT '自定义' COMMENT '分类：作息/专注/自定义'");
+            addColumnIfNotExists(databaseName, "quiet_hour_rule", "sort_order", 
+                "INT DEFAULT 0 COMMENT '排序号'");
+            addColumnIfNotExists(databaseName, "quiet_hour_rule", "create_time", 
+                "DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'");
+            addColumnIfNotExists(databaseName, "quiet_hour_rule", "update_time", 
+                "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'");
+            addColumnIfNotExists(databaseName, "quiet_hour_rule", "deleted", 
+                "INT DEFAULT 0 COMMENT '逻辑删除标记'");
+            
+            addIndexIfNotExists(databaseName, "quiet_hour_rule", "idx_enabled", "idx_enabled (enabled)");
+            addIndexIfNotExists(databaseName, "quiet_hour_rule", "idx_category", "idx_category (category)");
         }
     }
 }

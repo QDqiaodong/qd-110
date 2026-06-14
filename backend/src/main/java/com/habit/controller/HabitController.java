@@ -119,4 +119,22 @@ public class HabitController {
         statsService.clearStatsCache();
         return Result.success(habit);
     }
+
+    @GetMapping("/reminder-filtered")
+    public Result<List<Habit>> getHabitsWithReminderFiltered() {
+        List<Habit> habits = habitService.getHabitsWithReminderFiltered();
+        return Result.success(habits);
+    }
+
+    @GetMapping("/reminder-schedule")
+    public Result<Map<String, Object>> getReminderScheduleWithQuietHours() {
+        Map<String, Object> schedule = habitService.getReminderScheduleWithQuietHours();
+        return Result.success(schedule);
+    }
+
+    @GetMapping("/morning-cards/filtered")
+    public Result<List<MorningCardDTO>> getMorningCardsFiltered() {
+        List<MorningCardDTO> cards = habitService.getMorningCardsFilteredByQuietHours();
+        return Result.success(cards);
+    }
 }

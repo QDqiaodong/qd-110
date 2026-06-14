@@ -5,10 +5,12 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.habit.dto.HabitDTO;
 import com.habit.dto.MorningCardDTO;
 import com.habit.entity.Habit;
+import com.habit.entity.QuietHourRule;
 import com.habit.event.CheckinChangedEvent;
 import com.habit.mapper.HabitMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,10 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
     
     @Autowired
     private ApplicationEventPublisher eventPublisher;
+
+    @Autowired
+    @Lazy
+    private QuietHourRuleService quietHourRuleService;
     
     public List<Habit> getHabitList() {
         return this.list(new LambdaQueryWrapper<Habit>()
@@ -358,5 +364,32 @@ public class HabitService extends ServiceImpl<HabitMapper, Habit> {
         LocalDate today = LocalDate.now();
         eventPublisher.publishEvent(new CheckinChangedEvent(
             this, today, CheckinChangedEvent.ChangeType.HABIT_CHANGED));
+    }
+
+    public List<Habit> getHabitsWithReminderFiltered() {
+        List<Habit> allHabits = getHabitList();
+        return quietHourRuleService.filterHabitsByQuietHours(allHabits);
+    }
+
+    public Map<String, Object> getReminderScheduleWithQuietHours() {
+        List<Habit> allHabits = getHabitList();
+        return quietHourRuleService.getReminderSchedule(allHabits);
+    }
+
+    public List<MorningCardDTO> getMorningCardsFilteredByQuietHours() {
+        List<MorningCardDTO> allCards = getMorningCards();
+        List<QuietHourRule> quietRules = quietHourRuleService.getEnabledRules();
+        if (quietRules.isEmpty()) {
+            return allCards;
+        }
+        return allCards.stream()
+                .filter(card -> {
+                    String time = card.getTime();
+                    if (time == null || time.isEmpty()) {
+                        return true;
+                    }
+                    return !quietHourRuleService.isTimeInQuietHour(time);
+                })
+                .collect(Collectors.toList());
     }
 }
