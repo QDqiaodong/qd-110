@@ -49,7 +49,13 @@ export const checkinApi = {
 export const scheduleApi = {
   getTemplates: () => request.get('/schedules/templates'),
   getCurrent: () => request.get('/schedules/current'),
-  setCurrent: (id) => request.put('/schedules/current', { id })
+  setCurrent: (id) => request.put('/schedules/current', { id }),
+  create: (data) => request.post('/schedules', data),
+  delete: (id) => request.delete(`/schedules/${id}`),
+  copy: (id, data) => request.post(`/schedules/${id}/copy`, data),
+  update: (id, data) => request.put(`/schedules/${id}`, data),
+  updateTag: (id, tag) => request.put(`/schedules/${id}/tag`, { tag }),
+  getVersions: (id) => request.get(`/schedules/${id}/versions`)
 }
 
 export const statsApi = {

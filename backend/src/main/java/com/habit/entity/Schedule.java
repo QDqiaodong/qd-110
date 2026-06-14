@@ -15,9 +15,21 @@ public class Schedule {
     
     private String items;
     
+    private String weekdayItems;
+    
+    private String weekendItems;
+    
     private Boolean isCustom;
     
     private Boolean isCurrent;
+    
+    private Integer version;
+    
+    private Long parentId;
+    
+    private String tag;
+    
+    private String versionNote;
     
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

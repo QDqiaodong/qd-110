@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import dayjs from 'dayjs'
-import { habitApi, checkinApi, milestoneApi, streakApi } from '@/utils/request'
+import { habitApi, checkinApi, milestoneApi, streakApi, scheduleApi } from '@/utils/request'
 
 const CACHE_KEY = 'habit_assistant_cache'
 
@@ -25,8 +25,9 @@ export const useHabitStore = defineStore('habit', {
     archivedStreakCache: {},
     missReasonPresets: ['加班', '出门', '忘记', '状态差'],
     templateHistory: [],
+    scheduleTags: ['上学日', '备考期', '健身期', '工作期', '假期', '其他'],
     templates: [
-      { id: 1, name: '早起作息',
+      { id: 1, name: '早起作息', version: 1, parentId: null, createTime: null, tag: '工作期',
         weekdayItems: [
           { time: '06:00', title: '起床洗漱' },
           { time: '06:30', title: '晨练运动' },
@@ -52,7 +53,7 @@ export const useHabitStore = defineStore('habit', {
           { time: '23:00', title: '准备睡觉' }
         ]
       },
-      { id: 2, name: '学生作息',
+      { id: 2, name: '学生作息', version: 1, parentId: null, createTime: null, tag: '上学日',
         weekdayItems: [
           { time: '07:00', title: '起床早餐' },
           { time: '08:00', title: '早读' },
@@ -78,7 +79,7 @@ export const useHabitStore = defineStore('habit', {
           { time: '22:30', title: '入睡' }
         ]
       },
-      { id: 3, name: '健身作息',
+      { id: 3, name: '健身作息', version: 1, parentId: null, createTime: null, tag: '健身期',
         weekdayItems: [
           { time: '06:30', title: '起床' },
           { time: '07:00', title: '晨跑30分钟' },
@@ -290,6 +291,26 @@ export const useHabitStore = defineStore('habit', {
         const habits = state.habits.filter(h => this.getTimePeriod(h.time) === period)
         return habits.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'))
       }
+    },
+    getTemplateVersions: (state) => (templateId) => {
+      const allTemplates = [...state.templates, ...state.schedules]
+      const versions = allTemplates.filter(t => t.id === templateId || t.parentId === templateId || 
+        (t.parentId && allTemplates.some(p => p.id === templateId && (p.parentId === t.parentId || p.id === t.parentId))))
+      return versions.sort((a, b) => {
+        if (a.id === templateId) return -1
+        if (b.id === templateId) return 1
+        return (b.createTime || 0) - (a.createTime || 0)
+      })
+    },
+    getTemplateVersionTree: (state) => (templateId) => {
+      const allTemplates = [...state.templates, ...state.schedules]
+      const buildTree = (id) => {
+        const template = allTemplates.find(t => t.id === id)
+        if (!template) return null
+        const children = allTemplates.filter(t => t.parentId === id).map(t => buildTree(t.id)).filter(Boolean)
+        return { ...template, children }
+      }
+      return buildTree(templateId)
     },
     getDeviationAnalysis(state) {
       return (date = null) => {
@@ -749,11 +770,17 @@ export const useHabitStore = defineStore('habit', {
           this.archivedHabits = data.archivedHabits || []
           this.checkins = data.checkins || {}
           this.missReasons = data.missReasons || {}
-          this.schedules = data.schedules || []
-          this.currentSchedule = data.currentSchedule || this.templates[0]
+          this.schedules = (data.schedules || []).map(s => this.migrateScheduleData(s))
+          this.currentSchedule = this.migrateScheduleData(data.currentSchedule || this.templates[0])
           this.starredOrder = data.starredOrder || []
           this.nonStarredOrder = data.nonStarredOrder || []
           this.templateHistory = data.templateHistory || []
+          this.templates.forEach(t => {
+            if (!t.createTime) {
+              t.createTime = dayjs().format('YYYY-MM-DD HH:mm')
+            }
+          })
+          this.habitsLoaded = true
         } else {
           this.initDefaultData()
         }
@@ -796,6 +823,7 @@ export const useHabitStore = defineStore('habit', {
       return this.missReasons[targetDate]?.[habitId] || null
     },
     initDefaultData() {
+      const nowStr = dayjs().format('YYYY-MM-DD HH:mm')
       this.habits = [
         { id: 1, name: '早起', category: '作息', time: '07:00', remind: true, color: '#3b82f6', starred: true, archived: false, sortOrder: 1 },
         { id: 2, name: '阅读30分钟', category: '学习', time: '20:00', remind: true, color: '#10b981', starred: false, archived: false, sortOrder: 1 },
@@ -805,6 +833,9 @@ export const useHabitStore = defineStore('habit', {
       this.archivedHabits = []
       this.starredOrder = [1, 4]
       this.nonStarredOrder = [2, 3]
+      this.templates.forEach(t => {
+        t.createTime = t.createTime || nowStr
+      })
       this.currentSchedule = this.templates[0]
       this.templateHistory = [{
         templateId: this.templates[0].id,
@@ -814,6 +845,19 @@ export const useHabitStore = defineStore('habit', {
       }]
       this.habitsLoaded = true
       this.saveToCache()
+    },
+
+    migrateScheduleData(schedule) {
+      if (!schedule) return schedule
+      const nowStr = dayjs().format('YYYY-MM-DD HH:mm')
+      return {
+        ...schedule,
+        version: schedule.version || 1,
+        parentId: schedule.parentId || null,
+        createTime: schedule.createTime || nowStr,
+        tag: schedule.tag || '其他',
+        versionNote: schedule.versionNote || ''
+      }
     },
 
     async loadHabits(force = false) {
@@ -1313,8 +1357,14 @@ export const useHabitStore = defineStore('habit', {
     },
 
     addCustomSchedule(schedule) {
+      const nowStr = dayjs().format('YYYY-MM-DD HH:mm')
       const newSchedule = {
         id: Date.now(),
+        version: 1,
+        parentId: null,
+        createTime: nowStr,
+        tag: schedule.tag || '其他',
+        versionNote: schedule.versionNote || `创建于${nowStr}`,
         ...schedule,
         isCustom: true
       }
@@ -1333,6 +1383,114 @@ export const useHabitStore = defineStore('habit', {
         this.currentSchedule = this.templates[0]
       }
       this.saveToCache()
+    },
+
+    async copySchedule(template, options = {}) {
+      const allTemplates = [...this.templates, ...this.schedules]
+      const source = allTemplates.find(t => t.id === template.id) || template
+      const now = Date.now()
+      const nowStr = dayjs().format('YYYY-MM-DD HH:mm')
+      
+      const baseName = options.name || source.name
+      const version = (source.version || 1) + 1
+      
+      const newSchedule = {
+        id: now,
+        name: options.name ? options.name : `${baseName} v${version}`,
+        version,
+        parentId: source.id,
+        createTime: nowStr,
+        tag: options.tag || source.tag || '其他',
+        isCustom: true,
+        versionNote: options.versionNote || `基于「${source.name}」复制于${nowStr}`,
+        weekdayItems: JSON.parse(JSON.stringify(source.weekdayItems || source.items || [])),
+        weekendItems: JSON.parse(JSON.stringify(source.weekendItems || source.items || []))
+      }
+      
+      this.schedules.push(newSchedule)
+      this.saveToCache()
+      
+      try {
+        const res = await scheduleApi.copy(source.id, {
+          name: newSchedule.name,
+          tag: newSchedule.tag,
+          versionNote: newSchedule.versionNote,
+          weekdayItems: JSON.stringify(newSchedule.weekdayItems),
+          weekendItems: JSON.stringify(newSchedule.weekendItems)
+        })
+        if (res.code === 0 && res.data) {
+          const idx = this.schedules.findIndex(s => s.id === now)
+          if (idx > -1) {
+            this.schedules[idx].id = res.data.id
+            if (this.currentSchedule?.id === now) {
+              this.currentSchedule.id = res.data.id
+            }
+            this.saveToCache()
+          }
+        }
+      } catch (e) {
+        console.error('同步复制模板到后端失败', e)
+      }
+      
+      return newSchedule
+    },
+
+    renameSchedule(id, newName) {
+      const scheduleIndex = this.schedules.findIndex(s => s.id === id)
+      if (scheduleIndex > -1) {
+        this.schedules[scheduleIndex].name = newName
+        if (this.currentSchedule?.id === id) {
+          this.currentSchedule.name = newName
+        }
+        this.saveToCache()
+        return this.schedules[scheduleIndex]
+      }
+      
+      const templateIndex = this.templates.findIndex(t => t.id === id)
+      if (templateIndex > -1) {
+        this.templates[templateIndex].name = newName
+        if (this.currentSchedule?.id === id) {
+          this.currentSchedule.name = newName
+        }
+        this.saveToCache()
+        return this.templates[templateIndex]
+      }
+      
+      return null
+    },
+
+    updateScheduleTag(id, tag) {
+      const scheduleIndex = this.schedules.findIndex(s => s.id === id)
+      if (scheduleIndex > -1) {
+        this.schedules[scheduleIndex].tag = tag
+        if (this.currentSchedule?.id === id) {
+          this.currentSchedule.tag = tag
+        }
+        this.saveToCache()
+        return true
+      }
+      
+      const templateIndex = this.templates.findIndex(t => t.id === id)
+      if (templateIndex > -1) {
+        this.templates[templateIndex].tag = tag
+        if (this.currentSchedule?.id === id) {
+          this.currentSchedule.tag = tag
+        }
+        this.saveToCache()
+        return true
+      }
+      
+      return false
+    },
+
+    updateScheduleVersionNote(id, note) {
+      const scheduleIndex = this.schedules.findIndex(s => s.id === id)
+      if (scheduleIndex > -1) {
+        this.schedules[scheduleIndex].versionNote = note
+        this.saveToCache()
+        return true
+      }
+      return false
     },
 
     getRandomColor() {

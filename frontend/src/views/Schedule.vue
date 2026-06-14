@@ -102,8 +102,16 @@
         @click="selectTemplate(tpl)"
       >
         <div class="template-header">
-          <div class="template-name" :title="tpl.name">{{ tpl.name }}</div>
-          <van-tag v-if="store.currentSchedule?.id === tpl.id" type="primary" round size="small">使用中</van-tag>
+          <div class="template-name-wrap">
+            <div class="template-name" :title="tpl.name">{{ tpl.name }}</div>
+            <van-tag v-if="tpl.tag" size="mini" class="template-tag" :type="getTagType(tpl.tag)">{{ tpl.tag }}</van-tag>
+          </div>
+          <div class="template-header-right">
+            <van-tag v-if="store.currentSchedule?.id === tpl.id" type="primary" round size="small">使用中</van-tag>
+            <van-dropdown-menu v-if="!tpl.isCustom" class="template-more" @change="(v) => handleSystemTemplateAction(tpl, v)">
+              <van-dropdown-item :options="getSystemTemplateActions(tpl)" />
+            </van-dropdown-menu>
+          </div>
         </div>
         
         <div class="dual-column-content">
@@ -161,9 +169,18 @@
         @click="selectTemplate(tpl)"
       >
         <div class="template-header">
-          <div class="template-name" :title="tpl.name">{{ tpl.name }}</div>
+          <div class="template-name-wrap">
+            <div class="template-name" :title="tpl.name">{{ tpl.name }}</div>
+            <div class="template-meta">
+              <van-tag v-if="tpl.tag" size="mini" class="template-tag" :type="getTagType(tpl.tag)">{{ tpl.tag }}</van-tag>
+              <span v-if="tpl.version" class="version-badge">v{{ tpl.version }}</span>
+            </div>
+          </div>
           <div class="template-actions">
-            <van-icon name="delete-o" size="18" @click.stop="deleteTemplate(tpl.id)" />
+            <van-icon name="copy-o" size="16" @click.stop="showCopyDialog(tpl)" />
+            <van-icon name="edit" size="16" @click.stop="showRenameDialog(tpl)" />
+            <van-icon name="clock-o" size="16" @click.stop="showVersionHistory(tpl)" />
+            <van-icon name="delete-o" size="16" @click.stop="deleteTemplate(tpl.id)" />
           </div>
         </div>
         
@@ -492,6 +509,177 @@
         </div>
       </div>
     </van-popup>
+
+    <van-popup v-model:show="showCopyPopup" round position="bottom" :style="{ maxHeight: '70%' }">
+      <div class="copy-dialog">
+        <div class="dialog-header">
+          <h3>复制模板</h3>
+          <van-icon name="cross" @click="closeCopyPopup" />
+        </div>
+        <div class="dialog-body">
+          <div class="copy-source-info">
+            <span class="source-label">源模板</span>
+            <span class="source-name">{{ copyingTemplate?.name }}</span>
+          </div>
+          <van-cell-group inset>
+            <van-field
+              v-model="copyForm.name"
+              label="新名称"
+              placeholder="请输入新模板名称"
+              :rules="[{ required: true, message: '请输入模板名称' }]"
+            />
+            <van-field
+              v-model="copyForm.versionNote"
+              label="版本说明"
+              placeholder="可选：描述此版本的用途"
+              maxlength="50"
+              show-word-limit
+            />
+            <van-field
+              v-model="copyForm.tag"
+              label="标签"
+              placeholder="选择或输入标签"
+              is-link
+              readonly
+              @click="showTagPickerFor('copy')"
+            />
+          </van-cell-group>
+          <div v-if="copyingTemplate?.versionNote" class="version-note-preview">
+            <div class="note-label">源版本说明</div>
+            <div class="note-content">{{ copyingTemplate.versionNote }}</div>
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <van-button round block type="primary" @click="confirmCopy">创建副本</van-button>
+        </div>
+      </div>
+    </van-popup>
+
+    <van-popup v-model:show="showRenamePopup" round position="bottom" :style="{ maxHeight: '60%' }">
+      <div class="rename-dialog">
+        <div class="dialog-header">
+          <h3>编辑模板</h3>
+          <van-icon name="cross" @click="closeRenamePopup" />
+        </div>
+        <div class="dialog-body">
+          <van-cell-group inset>
+            <van-field
+              v-model="renameForm.name"
+              label="名称"
+              placeholder="请输入模板名称"
+              :rules="[{ required: true, message: '请输入模板名称' }]"
+            />
+            <van-field
+              v-model="renameForm.tag"
+              label="标签"
+              placeholder="选择或输入标签"
+              is-link
+              readonly
+              @click="showTagPickerFor('rename')"
+            />
+            <van-field
+              v-model="renameForm.versionNote"
+              label="版本说明"
+              placeholder="可选：描述此版本的用途"
+              maxlength="50"
+              show-word-limit
+            />
+          </van-cell-group>
+        </div>
+        <div class="dialog-footer">
+          <van-button round block type="primary" @click="confirmRename">保存修改</van-button>
+        </div>
+      </div>
+    </van-popup>
+
+    <van-popup v-model:show="showVersionPopup" round position="bottom" :style="{ height: '80%' }">
+      <div class="version-history-dialog">
+        <div class="dialog-header">
+          <h3>版本历史</h3>
+          <van-icon name="cross" @click="closeVersionPopup" />
+        </div>
+        <div class="dialog-body">
+          <div v-if="versionHistory.length === 0" class="empty-history">
+            <div class="empty-icon">📋</div>
+            <div class="empty-text">暂无版本记录</div>
+            <div class="empty-desc">复制模板后会在此处显示版本历史</div>
+          </div>
+          <div v-else class="version-tree">
+            <div
+              v-for="(item, idx) in versionHistory"
+              :key="item.id"
+              class="version-item"
+              :class="{ current: store.currentSchedule?.id === item.id }"
+            >
+              <div class="version-item-left">
+                <div class="version-dot" :class="{ root: !item.parentId }"></div>
+                <div v-if="idx < versionHistory.length - 1" class="version-line"></div>
+              </div>
+              <div class="version-item-content">
+                <div class="version-item-header">
+                  <span class="version-name">{{ item.name }}</span>
+                  <van-tag v-if="item.tag" size="mini" :type="getTagType(item.tag)">{{ item.tag }}</van-tag>
+                  <van-tag v-if="store.currentSchedule?.id === item.id" type="primary" size="mini">当前</van-tag>
+                </div>
+                <div class="version-item-meta">
+                  <span class="meta-item">
+                    <van-icon name="clock-o" size="11" />
+                    {{ item.createTime || '未知时间' }}
+                  </span>
+                  <span v-if="item.version" class="meta-item">
+                    <van-icon name="flag-o" size="11" />
+                    v{{ item.version }}
+                  </span>
+                </div>
+                <div v-if="item.versionNote" class="version-item-note">
+                  {{ item.versionNote }}
+                </div>
+                <div class="version-item-actions">
+                  <van-button size="mini" type="primary" plain @click="selectTemplate(item)">
+                    使用此版本
+                  </van-button>
+                  <van-button size="mini" @click.stop="showCopyDialog(item)">
+                    复制
+                  </van-button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </van-popup>
+
+    <van-popup v-model:show="showTagPicker" round position="bottom">
+      <div class="tag-picker-dialog">
+        <div class="dialog-header">
+          <h3>选择标签</h3>
+          <van-icon name="cross" @click="showTagPicker = false" />
+        </div>
+        <div class="dialog-body">
+          <div class="tag-options">
+            <div
+              v-for="tag in store.scheduleTags"
+              :key="tag"
+              class="tag-chip"
+              :class="{ active: tagFormValue === tag }"
+              :style="{ '--tag-color': getTagColor(tag) }"
+              @click="selectTag(tag)"
+            >
+              {{ tag }}
+            </div>
+          </div>
+          <van-field
+            v-model="customTag"
+            placeholder="或输入自定义标签"
+            maxlength="8"
+            class="custom-tag-input"
+          />
+        </div>
+        <div class="dialog-footer">
+          <van-button round block type="primary" @click="confirmCustomTag">确定</van-button>
+        </div>
+      </div>
+    </van-popup>
   </div>
 </template>
 
@@ -524,6 +712,27 @@ const conflicts = ref({
   overloadedSlots: [],
   unplaceableHabits: [],
   totalConflicts: 0
+})
+const showCopyPopup = ref(false)
+const showRenamePopup = ref(false)
+const showVersionPopup = ref(false)
+const showTagPicker = ref(false)
+const copyingTemplate = ref(null)
+const renamingTemplate = ref(null)
+const versionHistoryTemplate = ref(null)
+const versionHistory = ref([])
+const tagFormValue = ref('')
+const customTag = ref('')
+const tagFormTarget = ref('')
+const copyForm = ref({
+  name: '',
+  tag: '',
+  versionNote: ''
+})
+const renameForm = ref({
+  name: '',
+  tag: '',
+  versionNote: ''
 })
 
 const currentHour = computed(() => dayjs().hour())
@@ -968,6 +1177,178 @@ const deleteTemplate = async (id) => {
     store.deleteCustomSchedule(id)
     showToast('删除成功')
   } catch (e) {}
+}
+
+const tagColors = {
+  '上学日': '#3b82f6',
+  '备考期': '#ef4444',
+  '健身期': '#10b981',
+  '工作期': '#f59e0b',
+  '假期': '#8b5cf6',
+  '其他': '#6b7280'
+}
+
+const getTagColor = (tag) => {
+  return tagColors[tag] || '#6b7280'
+}
+
+const getTagType = (tag) => {
+  const typeMap = {
+    '上学日': 'primary',
+    '备考期': 'danger',
+    '健身期': 'success',
+    '工作期': 'warning',
+    '假期': 'primary',
+    '其他': 'default'
+  }
+  return typeMap[tag] || 'default'
+}
+
+const getSystemTemplateActions = (tpl) => {
+  return [
+    { text: '复制模板', value: 'copy' },
+    { text: '查看版本', value: 'versions' }
+  ]
+}
+
+const handleSystemTemplateAction = (tpl, value) => {
+  if (value === 'copy') {
+    showCopyDialog(tpl)
+  } else if (value === 'versions') {
+    showVersionHistory(tpl)
+  }
+}
+
+const showCopyDialog = (tpl) => {
+  copyingTemplate.value = tpl
+  copyForm.value = {
+    name: `${tpl.name} v${(tpl.version || 1) + 1}`,
+    tag: tpl.tag || '其他',
+    versionNote: ''
+  }
+  showCopyPopup.value = true
+}
+
+const closeCopyPopup = () => {
+  showCopyPopup.value = false
+  copyingTemplate.value = null
+}
+
+const confirmCopy = async () => {
+  if (!copyForm.value.name.trim()) {
+    showToast('请输入模板名称')
+    return
+  }
+  const newTemplate = await store.copySchedule(copyingTemplate.value, {
+    name: copyForm.value.name.trim(),
+    tag: copyForm.value.tag,
+    versionNote: copyForm.value.versionNote.trim()
+  })
+  closeCopyPopup()
+  showToast(`已复制为「${newTemplate.name}」`)
+  activeTab.value = 'custom'
+}
+
+const showRenameDialog = (tpl) => {
+  renamingTemplate.value = tpl
+  renameForm.value = {
+    name: tpl.name,
+    tag: tpl.tag || '其他',
+    versionNote: tpl.versionNote || ''
+  }
+  showRenamePopup.value = true
+}
+
+const closeRenamePopup = () => {
+  showRenamePopup.value = false
+  renamingTemplate.value = null
+}
+
+const confirmRename = () => {
+  if (!renameForm.value.name.trim()) {
+    showToast('请输入模板名称')
+    return
+  }
+  const tpl = renamingTemplate.value
+  if (tpl) {
+    store.renameSchedule(tpl.id, renameForm.value.name.trim())
+    store.updateScheduleTag(tpl.id, renameForm.value.tag)
+    if (tpl.isCustom) {
+      store.updateScheduleVersionNote(tpl.id, renameForm.value.versionNote.trim())
+    }
+    showToast('保存成功')
+  }
+  closeRenamePopup()
+}
+
+const showVersionHistory = (tpl) => {
+  versionHistoryTemplate.value = tpl
+  const allTemplates = [...store.templates, ...store.schedules]
+  const collectVersions = (id, collected = new Set()) => {
+    if (collected.has(id)) return []
+    collected.add(id)
+    const template = allTemplates.find(t => t.id === id)
+    if (!template) return []
+    const result = [template]
+    const children = allTemplates.filter(t => t.parentId === id)
+    children.forEach(child => {
+      result.push(...collectVersions(child.id, collected))
+    })
+    return result
+  }
+  
+  let versions = collectVersions(tpl.id)
+  const rootId = tpl.parentId || tpl.id
+  if (tpl.parentId) {
+    const rootVersions = collectVersions(rootId, new Set())
+    versions = [...new Map(rootVersions.map(v => [v.id, v])).values()]
+  }
+  
+  versionHistory.value = versions.sort((a, b) => {
+    if (!a.parentId) return -1
+    if (!b.parentId) return 1
+    if (a.parentId === rootId && b.parentId !== rootId) return -1
+    if (b.parentId === rootId && a.parentId !== rootId) return 1
+    return (new Date(b.createTime || 0)) - (new Date(a.createTime || 0))
+  })
+  
+  showVersionPopup.value = true
+}
+
+const closeVersionPopup = () => {
+  showVersionPopup.value = false
+  versionHistoryTemplate.value = null
+  versionHistory.value = []
+}
+
+const selectTag = (tag) => {
+  tagFormValue.value = tag
+  customTag.value = ''
+}
+
+const confirmCustomTag = () => {
+  const finalTag = customTag.value.trim() || tagFormValue.value
+  if (!finalTag) {
+    showToast('请选择或输入标签')
+    return
+  }
+  if (tagFormTarget.value === 'copy') {
+    copyForm.value.tag = finalTag
+  } else if (tagFormTarget.value === 'rename') {
+    renameForm.value.tag = finalTag
+  }
+  showTagPicker.value = false
+}
+
+const showTagPickerFor = (target) => {
+  tagFormTarget.value = target
+  if (target === 'copy') {
+    tagFormValue.value = copyForm.value.tag
+  } else if (target === 'rename') {
+    tagFormValue.value = renameForm.value.tag
+  }
+  customTag.value = ''
+  showTagPicker.value = true
 }
 
 const goToReview = () => {
@@ -2114,5 +2495,319 @@ const goToReview = () => {
   .van-button {
     flex: 1;
   }
+}
+
+.template-name-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.template-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.template-tag {
+  flex-shrink: 0;
+}
+
+.template-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.version-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.template-actions {
+  display: flex;
+  gap: 14px;
+  color: $text-secondary;
+  flex-shrink: 0;
+  align-items: center;
+
+  .van-icon {
+    cursor: pointer;
+    transition: color 0.2s ease;
+
+    &:hover, &:active {
+      color: $primary-color;
+    }
+  }
+}
+
+.template-more {
+  width: auto;
+  min-width: 0;
+  background: transparent;
+  border: none;
+
+  :deep(.van-dropdown-menu__bar) {
+    background: transparent;
+    height: auto;
+    box-shadow: none;
+  }
+
+  :deep(.van-dropdown-item__title) {
+    color: $text-secondary;
+    font-size: 16px;
+    padding: 0;
+  }
+}
+
+.copy-dialog,
+.rename-dialog,
+.version-history-dialog,
+.tag-picker-dialog {
+  padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid $border-color;
+
+  h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .van-icon {
+    font-size: 20px;
+    color: $text-secondary;
+    cursor: pointer;
+  }
+}
+
+.dialog-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 0;
+}
+
+.dialog-footer {
+  padding: 16px 20px;
+  border-top: 1px solid $border-color;
+}
+
+.copy-source-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  margin: 0 16px 16px;
+  background: #f9fafb;
+  border-radius: 10px;
+
+  .source-label {
+    font-size: 13px;
+    color: $text-secondary;
+  }
+
+  .source-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: $primary-color;
+  }
+}
+
+.version-note-preview {
+  margin: 16px;
+  padding: 12px;
+  background: #fef3c7;
+  border-radius: 8px;
+  border-left: 3px solid #f59e0b;
+
+  .note-label {
+    font-size: 11px;
+    color: #92400e;
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+
+  .note-content {
+    font-size: 12px;
+    color: #78350f;
+    line-height: 1.5;
+  }
+}
+
+.empty-history {
+  text-align: center;
+  padding: 60px 20px;
+
+  .empty-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+  }
+
+  .empty-text {
+    font-size: 14px;
+    color: $text-primary;
+    margin-bottom: 4px;
+  }
+
+  .empty-desc {
+    font-size: 12px;
+    color: $text-secondary;
+  }
+}
+
+.version-tree {
+  padding: 0 16px;
+}
+
+.version-item {
+  display: flex;
+  gap: 12px;
+
+  &.current {
+    .version-item-content {
+      background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
+      border: 1px solid #bfdbfe;
+    }
+  }
+}
+
+.version-item-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.version-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #d1d5db;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px #d1d5db;
+  flex-shrink: 0;
+  margin-top: 6px;
+
+  &.root {
+    background: $primary-color;
+    box-shadow: 0 0 0 2px $primary-color;
+  }
+}
+
+.version-line {
+  width: 2px;
+  flex: 1;
+  background: #e5e7eb;
+  margin: 4px 0;
+  min-height: 20px;
+}
+
+.version-item-content {
+  flex: 1;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+
+.version-item-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.version-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: $text-primary;
+}
+
+.version-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+
+  .meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    color: $text-secondary;
+  }
+}
+
+.version-item-note {
+  font-size: 12px;
+  color: #6b7280;
+  background: #fff;
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.version-item-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.tag-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 20px 16px;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: $text-secondary;
+  background: #f9fafb;
+  border: 1.5px solid $border-color;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &.active {
+    background: color-mix(in srgb, var(--tag-color, $primary-color) 12%, #fff);
+    border-color: var(--tag-color, $primary-color);
+    color: var(--tag-color, $primary-color);
+    font-weight: 500;
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
+}
+
+.custom-tag-input {
+  padding: 0 20px;
 }
 </style>

@@ -49,4 +49,38 @@ public class ScheduleController {
         }
         return Result.success();
     }
+    
+    @PostMapping("/{id}/copy")
+    public Result<Schedule> copySchedule(@PathVariable Long id, @RequestBody ScheduleDTO dto) {
+        Schedule schedule = scheduleService.copySchedule(id, dto);
+        if (schedule == null) {
+            return Result.error("复制失败，模板不存在");
+        }
+        return Result.success(schedule);
+    }
+    
+    @PutMapping("/{id}")
+    public Result<Schedule> updateSchedule(@PathVariable Long id, @RequestBody ScheduleDTO dto) {
+        Schedule schedule = scheduleService.renameSchedule(id, dto);
+        if (schedule == null) {
+            return Result.error("更新失败，模板不存在");
+        }
+        return Result.success(schedule);
+    }
+    
+    @PutMapping("/{id}/tag")
+    public Result<Schedule> updateScheduleTag(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        String tag = body.get("tag");
+        Schedule schedule = scheduleService.updateScheduleTag(id, tag);
+        if (schedule == null) {
+            return Result.error("更新失败，模板不存在");
+        }
+        return Result.success(schedule);
+    }
+    
+    @GetMapping("/{id}/versions")
+    public Result<List<Schedule>> getTemplateVersions(@PathVariable Long id) {
+        List<Schedule> versions = scheduleService.getTemplateVersions(id);
+        return Result.success(versions);
+    }
 }
